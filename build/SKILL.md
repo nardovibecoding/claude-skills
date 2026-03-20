@@ -106,6 +106,35 @@ When an agent returns "You've hit your limit":
 4. If >80% done: fix remaining issues directly
 5. If <80% done: spawn continuation agent with progress summary
 
+## Auto-detection
+
+Determine whether to spawn an agent or edit directly based on the user's prompt.
+
+### Agent keywords (spawn background agent)
+If the prompt contains words like: **build**, **create**, **implement**, **system**, **feature**, **refactor**, **design**, **architect**, **migrate**, **rewrite**, **add support for**, **integrate**
+- These signal multi-file, multi-step work that benefits from a dedicated agent
+- Vague scope ("build X", "implement Y", "create a system for Z") always means agent
+
+### Direct edit keywords (do it inline)
+If the prompt contains words like: **fix**, **change**, **update**, **tweak**, **adjust**, **rename**, **typo**, **bump**, **set**, **remove**, **delete**, **add line**, **move**
+- These signal small, targeted changes to known files
+- Specific file references ("in config.py, change X to Y") always means direct edit
+
+### Heuristic decision flow
+1. Count agent keywords vs direct-edit keywords in the prompt
+2. If agent keywords dominate (or prompt is vague with no specific files mentioned) → spawn agent
+3. If direct-edit keywords dominate (or prompt names specific files and small changes) → direct edit
+4. If ambiguous but mentions >2 files or >30 lines of change → agent
+5. If ambiguous but mentions 1 file and a small fix → direct edit
+
+### Examples
+- "Build a weekly usage report scheduler" → agent (build + system-level)
+- "Fix the typo in config.py line 42" → direct edit
+- "Implement OAuth2 integration with Google" → agent (implement + integrate + multi-file)
+- "Change the timeout from 30 to 60 in helpers.py" → direct edit
+- "Refactor the digest pipeline to use async" → agent (refactor + system-wide)
+- "Add a line to imports in __main__.py" → direct edit
+
 ## Important Rules
 
 - ALWAYS spawn agents in background (run_in_background: true)
