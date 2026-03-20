@@ -89,13 +89,29 @@ UNCHANGED FROM LAST WEEK (still not fixed):
 
 Send report to TG group thread 152 (not DM).
 
-## Multi-Model Critic (when available)
+## Multi-Model Critic (GPT — ENABLED)
 
-If a second model API is configured (Gemini, GPT), use it as the critic instead of Claude.
-Different training data = different blind spots = better criticism.
+GPT-4o is configured as the external critic. Use it for genuine second opinions since different training data = different blind spots.
 
-To enable: set `CRITIC_MODEL_API_KEY` and `CRITIC_MODEL_URL` in .env.
-If not set, fall back to Claude with adversarial prompt.
+**How to use in code/scripts:**
+```python
+from openai import OpenAI
+import os
+client = OpenAI(api_key=os.environ["CRITIC_API_KEY"])
+resp = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": f"Review this code critically. Find every flaw:\n\n{code}"}],
+)
+print(resp.choices[0].message.content)
+```
+
+**When to use GPT vs Claude adversarial prompt:**
+- Code review after major changes → GPT (genuinely different perspective)
+- Weekly red team → GPT (catches Claude-specific blind spots)
+- Quick on-demand /critic → Claude adversarial (faster, no API cost)
+- Evolution security review → keep Claude (already has anti-sycophancy gate)
+
+**Key:** `CRITIC_API_KEY` in .env (both Mac and VPS). Model: `gpt-4o`.
 
 ## Anti-Sycophancy Across the Board
 
