@@ -63,6 +63,12 @@ done
 git diff --stat
 ```
 
+**DM routing check** — warn if scheduler functions send to ADMIN_USER_ID:
+```bash
+grep -n "ADMIN_USER_ID" $(git diff --name-only --diff-filter=AM -- '*.py' | grep -i schedul) 2>/dev/null | grep -v "from_user\|query\.\|#.*ADMIN" && echo "⚠️ ADMIN_USER_ID found in scheduler — should this go to GROUP_ID + thread instead?"
+```
+This is a WARNING only — some DM sends are intentional (error alerts, personal reminders).
+
 ### Step 4: Handle Failures
 
 If syntax check fails:
