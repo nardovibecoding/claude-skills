@@ -1,6 +1,10 @@
 ---
 name: docx
-description: "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation."
+description: |
+  Word document (.docx) create, read, edit, format, extract, convert.
+  Triggers: "Word doc", ".docx", "word document", requests for reports/memos/letters as Word files, find-and-replace in Word, tracked changes, images in documents.
+  NOT FOR: PDFs (pdf), spreadsheets (xlsx), Google Docs, general coding unrelated to documents.
+  Produces: professional .docx with headings, TOC, page numbers, letterheads.
 license: Proprietary. LICENSE.txt has complete terms
 ---
 

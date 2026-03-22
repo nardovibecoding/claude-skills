@@ -1,14 +1,10 @@
 ---
 name: singlesourceoftruth
 description: |
-  Unified Mac-VPS sync via GitHub. Replaces mactovps and vpstomac.
-  Everything flows through git — code, memory, skills, config.
-
-  USE FOR:
-  - "deploy", "push to vps", "sync to server", "mactovps"
-  - "switch to mac", "run locally", "vpstomac"
-  - "sync", "sync everything", "single source of truth"
-  - After any code/skill/config change that needs to reach the other side
+  Mac-VPS sync via GitHub — deploy, pull, push code/memory/skills/config.
+  Triggers: "deploy", "push to vps", "sync", "mactovps", "vpstomac", "sync to server", "single source of truth".
+  NOT FOR: git commits (just use git), skill installs (use extractskill).
+  Produces: synced state between Mac and VPS via git push/pull.
 user-invocable: true
 ---
 

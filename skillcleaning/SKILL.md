@@ -1,15 +1,10 @@
 ---
 name: skillcleaning
 description: |
-  Audit, clean, and monitor all installed Claude Code skills.
-  Checks for: outdated skills, duplicates, broken scripts, unused skills,
-  upstream updates, disk usage, and inconsistencies.
-
-  USE FOR:
-  - "skill cleaning", "clean skills", "audit skills"
-  - "check for skill updates", "are my skills up to date"
-  - "which skills am I not using", "skill health"
-  - Periodic maintenance (monthly recommended)
+  Audit all installed skills — duplicates, broken scripts, unused, disk usage, upstream updates.
+  Triggers: "skill cleaning", "audit skills", "skill health", "check budget", "unused skills".
+  NOT FOR: installing skills (use extractskill), security scans (use skill-security-auditor).
+  Produces: health report with disable/trim/merge recommendations.
 user-invocable: true
 ---
 

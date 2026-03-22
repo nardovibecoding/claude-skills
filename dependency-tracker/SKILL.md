@@ -1,6 +1,10 @@
 ---
 name: dependency-tracker
-description: Use when ANY change is made to the system — renamed files, moved configs, changed persona IDs, updated thread IDs, modified cron jobs, edited config.py, or restructured code. Automatically finds and updates ALL references across the entire codebase. Triggers on "check dependencies", "update references", "what references X", "sync dependencies", or after any rename/move/restructure operation.
+description: |
+  Find and update all references after renames, moves, config changes.
+  Triggers: "check dependencies", "update references", "what references X", "sync dependencies", after any rename/move/restructure.
+  NOT FOR: deploying changes (use singlesourceoftruth), code review (use review).
+  Produces: all stale references found and updated across codebase.
 ---
 
 # Dependency Tracker

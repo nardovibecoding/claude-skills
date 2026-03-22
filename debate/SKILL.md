@@ -1,11 +1,10 @@
 ---
 name: debate
 description: |
-  R&D Council — 6 AI models debate any topic in multi-round discussions.
-  Models argue, challenge each other, and produce a consensus memo.
-  Use for: strategic decisions, product ideas, code architecture, business growth.
+  6-model R&D Council debate — multi-round argument, cross-examination, consensus memo.
   Triggers: "/debate", "council", "R&D meeting", "model debate", "6 models discuss".
-  Can run on-demand or as scheduled cron (2x daily).
+  NOT FOR: simple questions (just ask), code review (use review), brainstorming (use office-hours).
+  Produces: executive memo with consensus position from 6 AI models.
 ---
 
 # R&D Council — Multi-Model Debate
