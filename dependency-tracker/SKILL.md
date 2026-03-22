@@ -141,7 +141,18 @@ After approval:
 - Check cron syntax if cron was modified
 - If ANY verification fails → revert that specific file and warn
 
-### Step 7: Report
+### Step 7: Integration Test (spawn background agent)
+After all edits pass syntax check, spawn a test agent to verify nothing broke:
+- Import each changed .py module: `python3 -c "import module_name"`
+- For persona changes: verify persona JSON loads and has required fields (id, display_name, xcurate_target)
+- For thread/routing changes: send a test message to the new thread via Bot API
+- For cron changes: `crontab -l | grep new_value` to confirm cron updated
+- For .env changes: `source .env && echo $NEW_VAR` to confirm env loads
+- For flag files: verify old flags renamed/cleaned, new flags writable
+- Report: "X/Y integration checks passed" or "FAILED: [which check]"
+- If ANY integration test fails → warn user before committing
+
+### Step 8: Report
 Output a change report:
 
 ```
