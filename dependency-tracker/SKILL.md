@@ -106,15 +106,42 @@ Sort findings into:
 | **Should update** | Display names, comments, docs — won't break but misleading |
 | **Skip** | Git history, logs, cache files — read-only/ephemeral |
 
-### Step 4: Update All References
-Update every "must update" and "should update" reference. Use Edit tool for precision.
+### Step 4: Propose Changes (DO NOT EDIT YET)
+For each "must update" and "should update" reference, prepare the exact edit:
+```
+📝 Proposed changes (8 total):
 
-### Step 5: Verify
+MUST UPDATE:
+1. config.py:45 — "twitter" → "九院院长"
+2. send_xdigest.py:12 — TELEGRAM_BOT_TOKEN_TWITTER → unchanged (still correct key name)
+3. auto_healer.py:89 — "twitter" → "twitter" (persona ID unchanged, display name only)
+
+SHOULD UPDATE:
+4. memory/project_personas.md:13 — "Elon | X curation EN" → "九院院长 | XHS 医美"
+5. CLAUDE.md:234 — "twitter (Elon)" → "twitter (九院院长)"
+
+NO ACTION:
+6. git history — read-only
+7. .digest_sent_x_twitter — flag file, persona ID unchanged
+```
+
+### Step 5: User Confirmation
+**STOP and show the proposed changes. Ask: "Approve all? Or select which to apply?"**
+
+Options:
+- "yes" / "approve" → execute all proposed edits
+- "skip 3,5" → execute all except items 3 and 5
+- "no" / "cancel" → abort, no changes made
+
+### Step 6: Execute + Verify
+After approval:
+- Apply all approved edits using Edit tool
 - `python3 -c "import py_compile; py_compile.compile('file.py', doraise=True)"` for each changed .py
-- Check cron syntax if cron was modified
 - Verify JSON validity for any changed .json files
+- Check cron syntax if cron was modified
+- If ANY verification fails → revert that specific file and warn
 
-### Step 6: Report
+### Step 7: Report
 Output a change report:
 
 ```
@@ -170,10 +197,5 @@ crontab entry → auto_healer.py schedule checks → admin_bot/commands.py sched
               → ADMIN_HANDBOOK.md docs → memory/project_*.md
 ```
 
-## Anti-Patterns (What NOT to do)
-
-1. **Update only the primary file** — "I changed the persona JSON, done!" No. 10+ files reference it.
-2. **Search only .py files** — Shell scripts, JSON configs, markdown docs, cron jobs all have references.
-3. **Skip memory/docs** — Stale docs cause future sessions to make wrong assumptions.
-4. **Trust your memory of the codebase** — ALWAYS grep. Files you forgot about will bite you.
-5. **Update one-by-one without a list** — Make the full list FIRST, then update. Partial updates = partial breakage.
+## Anti-Patterns
+See [references/anti-patterns.md](references/anti-patterns.md)
