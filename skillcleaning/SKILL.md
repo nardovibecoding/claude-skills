@@ -199,8 +199,10 @@ RECOMMENDATIONS:
 ## Actions
 
 After the report, offer to:
-- Delete unused skills (with confirmation)
+- Delete replaced skills (fully superseded → rm)
+- Disable unused skills (might re-enable → .disabled)
+- Optimize bloated descriptions (rewrite with 3-part framework)
 - Update skills from upstream
 - Install missing dependencies
 - Fix broken scripts
-- Commit and push changes to skills repo
+- Report final budget: "X / 20,000 chars (Y%), Z skills active"
