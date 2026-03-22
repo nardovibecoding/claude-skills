@@ -138,6 +138,26 @@ Every skill should have:
 
 Flag skills missing these.
 
+### 11. Description Optimization
+
+Every YAML description must follow the **3-part framework**:
+1. **What it does** — front-loaded in first 50 chars (trigger keywords)
+2. **Triggers** — explicit phrases: "skill cleaning", "audit skills"
+3. **Anti-triggers** — NOT FOR: what should use a DIFFERENT skill instead
+4. **Produces** — what the output is
+
+Max 400 chars per description. Check:
+```bash
+for f in $(find ~/.claude/skills -name "SKILL.md" -not -path "*/node_modules/*" -not -path "*/.git/*"); do
+  chars=$(awk '/^---/{n++; next} n==1{print}' "$f" | wc -c)
+  name=$(basename $(dirname "$f"))
+  [ "$chars" -gt 400 ] && echo "OVER: $name ($chars chars)"
+done
+```
+
+For skills over 400 chars, rewrite description following the framework.
+For skills missing anti-triggers, add "NOT FOR:" line pointing to correct alternative.
+
 ## Output Format
 
 ```
