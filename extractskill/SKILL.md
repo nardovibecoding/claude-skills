@@ -1,6 +1,10 @@
 ---
 name: extractskill
-description: Evaluate and extract useful patterns from community AI skills. Use when user shares a skill repo URL, a list of skills to evaluate, or says "extract skill", "evaluate skill", "check this skill". Fetches SKILL.md, assesses overlap with existing system, and either installs (if genuinely new) or extracts the valuable patterns into memory.
+description: |
+  Evaluate and install community AI skills from GitHub URLs or skill repos.
+  Triggers: "extract skill", "evaluate skill", "check this skill", shared skill URL, list of skills to review.
+  NOT FOR: security scanning (use skill-security-auditor), skill cleanup (use skillcleaning).
+  Produces: installed skill or extracted patterns saved to memory.
 user-invocable: true
 ---
 

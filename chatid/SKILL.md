@@ -1,11 +1,8 @@
 ---
 name: chatid
 description: |
-  Show the current Claude Code session/chat ID so the user can resume it elsewhere (e.g. on Telegram via admin bot).
-
-  USE FOR:
-  - When user asks for "chat id", "session id", "conversation id"
-  - When user wants to transfer/resume this session on mobile or Telegram
+  Show current session/chat ID for resuming elsewhere.
+  Triggers: "chat id", "session id", "conversation id", "transfer session".
 user_invocable: true
 ---
 

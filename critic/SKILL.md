@@ -1,13 +1,10 @@
 ---
 name: critic
 description: |
-  Adversarial critic that attacks your own system. Use after major changes,
-  weekly as scheduled red team, or on-demand when something feels off.
-
-  USE FOR:
-  - "critic", "red team", "attack this", "what's wrong with this"
-  - "review my changes", "find flaws", "challenge this"
-  - Weekly scheduled red team session (VPS cron)
+  Adversarial red team — find security holes, logic bugs, wasted resources.
+  Triggers: "critic", "red team", "attack this", "what's wrong", "find flaws", "challenge this".
+  NOT FOR: code review before merge (use review), debugging (use systematic-debugging).
+  Produces: prioritized list of flaws with severity and remediation steps.
 user-invocable: true
 ---
 
