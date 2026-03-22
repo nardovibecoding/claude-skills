@@ -1,3 +1,12 @@
+---
+name: memory-maintenance
+description: |
+  Memory maintenance, stale cleanup, JSONL mining, pattern promotion.
+  Triggers: "memory maintenance", "clean memory", "stale memory", "mine sessions", "promote patterns", "extract from JSONL".
+  NOT FOR: reading/writing specific memory files (just edit directly), skill management (use skillcleaning).
+  Produces: updated memory files, stale entries removed, new patterns promoted to rules, skills extracted from recurring solutions.
+---
+
 # Memory Maintenance — Extract, validate, promote, and evolve memory
 
 Five jobs: mine expiring sessions for unsaved knowledge, detect stale memory, clean up, promote proven patterns to enforced rules, and extract reusable skills from recurring solutions.
