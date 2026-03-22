@@ -1,5 +1,5 @@
 ---
-name: home
+name: homeinout
 description: |
   Transfer session between Mac and phone. /home out = transfer to phone (TG).
   /home in = resume on Mac from phone. Triggers: "homeout", "homein",

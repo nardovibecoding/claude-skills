@@ -1,5 +1,5 @@
 ---
-name: indicator
+name: indicatorinout
 description: |
   Switch voice indicator mode. /indicator plugged = menubar (dual monitor).
   /indicator unplugged = floating dot (single monitor).
