@@ -71,13 +71,48 @@ If catchup report shows unsynced context:
 
 Before ANY complex task:
 
-1. **Create `task_plan.md`** — Use [templates/task_plan.md](templates/task_plan.md) as reference
-2. **Create `findings.md`** — Use [templates/findings.md](templates/findings.md) as reference
-3. **Create `progress.md`** — Use [templates/progress.md](templates/progress.md) as reference
-4. **Re-read plan before decisions** — Refreshes goals in attention window
-5. **Update after each phase** — Mark complete, log errors
+1. **Scan context** — Read README.md, docs/, relevant source files. Identify constraints (language, frameworks, CI, deployment).
+2. **Ask at most 1–2 blocking questions** — prefer multiple-choice. If not blocked, assume and proceed.
+3. **Create `task_plan.md`** using the structured template below
+4. **Create `findings.md`** — Use [templates/findings.md](templates/findings.md) as reference
+5. **Create `progress.md`** — Use [templates/progress.md](templates/progress.md) as reference
+6. **Re-read plan before decisions** — Refreshes goals in attention window
+7. **Update after each phase** — Mark complete, log errors
 
 > **Note:** Planning files go in your project root, not the skill installation folder.
+
+## Plan Structure (follow exactly)
+
+Every `task_plan.md` MUST include these sections:
+
+```markdown
+# Plan: [Brief Description]
+
+<1–3 sentences: what we're doing, why, and the high-level approach.>
+
+## Scope
+- **In:** [what this plan covers]
+- **Out:** [what is explicitly excluded]
+
+## Action Items
+- [ ] <Verb-first step 1> — `path/to/file`
+- [ ] <Verb-first step 2> — `path/to/file`
+- [ ] <Verb-first step 3>
+- [ ] ...
+- [ ] Validate: <test/verification step>
+- [ ] Handle edge case: <risk mitigation>
+
+## Open Questions
+- <max 3 unknowns>
+```
+
+### Action Item Rules
+- **6–10 items** per plan (default). Atomic and ordered: discovery → changes → tests → rollout.
+- **Verb-first**: "Add…", "Refactor…", "Verify…", "Ship…", "Remove…"
+- **Point to files**: mention specific paths/modules when helpful
+- **Always include**: at least one test/validation item and one edge-case/risk item
+- **Include rollout** when relevant: feature flag, migration plan, rollback note
+- **Avoid**: vague steps ("handle backend"), too many micro-steps, code snippets in plans
 
 ## The Core Pattern
 
