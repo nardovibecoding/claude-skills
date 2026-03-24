@@ -30,6 +30,14 @@ AUDITOR_SCRIPT = Path(__file__).parent / "skill_security_auditor.py"
 BASELINE_FILE = Path.home() / ".claude" / "skill_checksums.json"
 REPORT_FILE = Path.home() / ".claude" / "skill_rescan_report.json"
 
+# Skills that legitimately contain patterns they scan for (self-referential)
+# or use flagged APIs as core functionality (e.g. browsers use child_process)
+WHITELIST = {
+    "skill-security-auditor",  # contains detection patterns + threat model examples
+    "browse",                  # headless browser needs child_process
+    "extractskill",            # references injection patterns in documentation
+}
+
 
 def hash_skill_dir(skill_path: Path) -> str:
     """SHA-256 hash of all file contents in a skill directory."""
@@ -141,6 +149,12 @@ def main():
     worst_exit = 0
 
     for skill_dir in skills_to_scan:
+        if skill_dir.name in WHITELIST:
+            print(f"  Auditing {skill_dir.name}... ⏭️  WHITELISTED")
+            results.append({"skill_name": skill_dir.name, "verdict": "PASS", "whitelisted": True})
+            verdicts["PASS"] += 1
+            continue
+
         print(f"  Auditing {skill_dir.name}...", end=" ", flush=True)
         result = audit_skill(skill_dir)
         verdict = result.get("verdict", "ERROR")
