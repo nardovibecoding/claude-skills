@@ -2,9 +2,9 @@
 name: planning-with-files
 description: |
   Plan, break down, track multi-step tasks with persistent files (task_plan.md, progress.md, findings.md).
-  Triggers: "plan this", "break this down", "organize this project", "track progress", multi-step work needing >5 tool calls.
+  Triggers: "plan this", "break this down", "organize this project", "track progress", "create a plan", multi-step work needing >5 tool calls.
   NOT FOR: simple single-step tasks, quick questions, or code-only changes.
-  Produces: structured plan files with phase tracking, auto-recovers after /clear.
+  Produces: structured plan with scope/action items, persistent file tracking, auto-recovers after /clear.
 user-invocable: true
 allowed-tools: "Read, Write, Edit, Bash, Glob, Grep"
 hooks:
