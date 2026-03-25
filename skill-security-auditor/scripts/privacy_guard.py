@@ -131,6 +131,145 @@ def scan_file(filepath: Path, patterns: dict) -> list:
     return findings
 
 
+def scan_filename(filepath: Path, patterns: dict) -> list:
+    """Scan file/directory NAMES for personal details."""
+    findings = []
+    name = filepath.name.lower()
+    for category, values in patterns.items():
+        for value in values:
+            if not value:
+                continue
+            if value.lower() in name:
+                findings.append({
+                    "file": str(filepath),
+                    "line": 0,
+                    "category": f"filename:{category}",
+                    "match": value,
+                    "context": f"Filename contains '{value}'",
+                })
+    return findings
+
+
+def scan_base64_strings(filepath: Path, patterns: dict) -> list:
+    """Detect base64-encoded personal details in file content."""
+    import base64
+    findings = []
+    if filepath.suffix.lower() in SKIP_EXTENSIONS:
+        return findings
+    try:
+        content = filepath.read_text(errors="ignore")
+    except (OSError, PermissionError):
+        return findings
+
+    b64_pattern = re.compile(r'[A-Za-z0-9+/]{20,}={0,2}')
+    for line_num, line in enumerate(content.split("\n"), 1):
+        for match in b64_pattern.finditer(line):
+            try:
+                decoded = base64.b64decode(match.group()).decode("utf-8", errors="ignore")
+                for category, values in patterns.items():
+                    for value in values:
+                        if value and value.lower() in decoded.lower():
+                            findings.append({
+                                "file": str(filepath),
+                                "line": line_num,
+                                "category": f"base64:{category}",
+                                "match": f"base64 contains '{value}'",
+                                "context": f"Decoded: {decoded[:80]}",
+                            })
+            except Exception:
+                continue
+    return findings
+
+
+def scan_git_history(dirpath: Path, patterns: dict) -> list:
+    """Scan git commit messages and author info for personal details."""
+    findings = []
+    git_dir = dirpath / ".git"
+    if not git_dir.exists():
+        return findings
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(dirpath), "log", "--all", "--format=%H|%an|%ae|%s"],
+            capture_output=True, text=True, timeout=10,
+        )
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            parts = line.split("|", 3)
+            if len(parts) < 4:
+                continue
+            commit_hash, author, email, subject = parts
+            for category, values in patterns.items():
+                for value in values:
+                    if not value:
+                        continue
+                    for field, field_name in [(author, "author"), (email, "email"), (subject, "subject")]:
+                        if re.search(re.escape(value), field, re.IGNORECASE):
+                            findings.append({
+                                "file": f"git:{commit_hash[:8]}",
+                                "line": 0,
+                                "category": f"git-history:{category}",
+                                "match": value,
+                                "context": f"Commit {field_name}: {field[:80]}",
+                            })
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    return findings
+
+
+def scan_exif(dirpath: Path) -> list:
+    """Check for images with EXIF data that could leak location/device info."""
+    findings = []
+    image_exts = {".jpg", ".jpeg", ".png", ".tiff", ".heic"}
+    for root, dirs, files in os.walk(dirpath):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        for fname in files:
+            filepath = Path(root) / fname
+            if filepath.suffix.lower() not in image_exts:
+                continue
+            # Check file size — EXIF-stripped images are usually smaller
+            try:
+                with open(filepath, "rb") as f:
+                    header = f.read(12)
+                # JPEG with EXIF: starts with FF D8 FF E1
+                if header[:4] == b'\xff\xd8\xff\xe1':
+                    findings.append({
+                        "file": str(filepath),
+                        "line": 0,
+                        "category": "exif",
+                        "match": "JPEG with EXIF metadata",
+                        "context": "May contain GPS coordinates, device name, or username. Strip with: exiftool -all= file.jpg",
+                    })
+            except (OSError, PermissionError):
+                continue
+    return findings
+
+
+def check_gitignore(dirpath: Path) -> list:
+    """Warn if .env or credential files are not in .gitignore."""
+    findings = []
+    gitignore = dirpath / ".gitignore"
+    gitignore_content = ""
+    if gitignore.exists():
+        gitignore_content = gitignore.read_text()
+
+    dangerous_files = [".env", "credentials.json", "*.pem", "*.key", "id_rsa"]
+    for danger in dangerous_files:
+        # Check if file exists but isn't gitignored
+        if danger.startswith("*"):
+            continue  # skip glob patterns for existence check
+        if (dirpath / danger).exists() and danger not in gitignore_content:
+            findings.append({
+                "file": str(dirpath / danger),
+                "line": 0,
+                "category": "gitignore-missing",
+                "match": danger,
+                "context": f"'{danger}' exists but is NOT in .gitignore — will be published!",
+            })
+    return findings
+
+
 def scan_directory(dirpath: Path, patterns: dict) -> list:
     """Scan all files in a directory."""
     all_findings = []
@@ -141,8 +280,14 @@ def scan_directory(dirpath: Path, patterns: dict) -> list:
 
         for fname in files:
             filepath = Path(root) / fname
-            findings = scan_file(filepath, patterns)
-            all_findings.extend(findings)
+            all_findings.extend(scan_filename(filepath, patterns))
+            all_findings.extend(scan_file(filepath, patterns))
+            all_findings.extend(scan_base64_strings(filepath, patterns))
+
+    # Repo-level scans
+    all_findings.extend(scan_git_history(dirpath, patterns))
+    all_findings.extend(scan_exif(dirpath))
+    all_findings.extend(check_gitignore(dirpath))
 
     return all_findings
 
