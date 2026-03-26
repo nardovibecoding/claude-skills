@@ -10,8 +10,8 @@ Usage:
 import argparse
 import json
 import os
-import sys
 from pathlib import Path
+from typing import Optional
 
 import tweepy
 from dotenv import load_dotenv
@@ -24,20 +24,20 @@ load_dotenv(ENV_PATH)
 def get_client() -> tweepy.Client:
     """Create authenticated X API v2 client."""
     return tweepy.Client(
-        consumer_key=os.getenv("X_API_KEY"),
-        consumer_secret=os.getenv("X_API_SECRET"),
-        access_token=os.getenv("X_ACCESS_TOKEN"),
-        access_token_secret=os.getenv("X_ACCESS_TOKEN_SECRET"),
+        consumer_key=os.environ["X_API_KEY"],
+        consumer_secret=os.environ["X_API_SECRET"],
+        access_token=os.environ["X_ACCESS_TOKEN"],
+        access_token_secret=os.environ["X_ACCESS_TOKEN_SECRET"],
     )
 
 
 def get_api_v1() -> tweepy.API:
     """Create v1.1 API for media uploads (v2 doesn't support media upload)."""
     auth = tweepy.OAuth1UserHandler(
-        os.getenv("X_API_KEY"),
-        os.getenv("X_API_SECRET"),
-        os.getenv("X_ACCESS_TOKEN"),
-        os.getenv("X_ACCESS_TOKEN_SECRET"),
+        os.environ["X_API_KEY"],
+        os.environ["X_API_SECRET"],
+        os.environ["X_ACCESS_TOKEN"],
+        os.environ["X_ACCESS_TOKEN_SECRET"],
     )
     return tweepy.API(auth)
 
@@ -49,22 +49,26 @@ def upload_media(image_path: str) -> str:
     return media.media_id_string
 
 
-def post_tweet(text: str, reply_to: str = None, media_path: str = None) -> dict:
+def post_tweet(
+    text: str,
+    reply_to: Optional[str] = None,
+    media_path: Optional[str] = None,
+) -> dict:
     """Post a tweet. Returns tweet data."""
     client = get_client()
 
-    kwargs = {"text": text}
+    kwargs: dict = {}
 
     if reply_to:
         kwargs["in_reply_to_tweet_id"] = reply_to
 
     if media_path:
         media_id = upload_media(media_path)
-        kwargs["media_ids"] = [media_id]
+        kwargs["media_ids"] = [int(media_id)]
 
-    response = client.create_tweet(**kwargs)
+    response = client.create_tweet(text=text, **kwargs)
 
-    tweet_id = response.data["id"]
+    tweet_id = response.data["id"]  # type: ignore[index]
     url = f"https://x.com/nardovibecoding/status/{tweet_id}"
 
     return {
@@ -74,11 +78,11 @@ def post_tweet(text: str, reply_to: str = None, media_path: str = None) -> dict:
     }
 
 
-def send_tg_alert(tweet_data: dict):
+def send_tg_alert(tweet_data: dict) -> None:
     """Send notification to TG topic thread."""
     import requests
 
-    bot_token = os.getenv("ADMIN_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
+    bot_token = os.getenv("ADMIN_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN_ADMIN")
     if not bot_token:
         return
 
@@ -98,7 +102,7 @@ def send_tg_alert(tweet_data: dict):
     )
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Post tweet via X API")
     parser.add_argument("text", help="Tweet text")
     parser.add_argument("--reply-to", help="Tweet ID to reply to")
