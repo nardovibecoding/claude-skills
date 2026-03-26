@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Add a new slide to an unpacked PPTX directory.
 
 Usage: python add_slide.py <unpacked_dir> <source>

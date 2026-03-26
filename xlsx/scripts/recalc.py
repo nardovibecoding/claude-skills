@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """
 Excel Formula Recalculation Script
 Recalculates all formulas in an Excel file using LibreOffice

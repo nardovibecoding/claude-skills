@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """LLM judge for content quality (headlines, titles, descriptions).
 Uses the user's existing CLI tool (claude, codex, gemini) for evaluation.
 DO NOT MODIFY after experiment starts — this is the fixed evaluator."""

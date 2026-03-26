@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """
 Validator for PowerPoint presentation XML files against XSD schemas.
 """

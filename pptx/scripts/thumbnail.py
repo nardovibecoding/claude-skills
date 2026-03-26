@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Create thumbnail grids from PowerPoint presentation slides.
 
 Creates a grid layout of slide thumbnails for quick visual analysis.

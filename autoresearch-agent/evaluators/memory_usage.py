@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Measure peak memory usage of a command.
 DO NOT MODIFY after experiment starts — this is the fixed evaluator."""
 

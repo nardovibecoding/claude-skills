@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Merge adjacent runs with identical formatting in DOCX.
 
 Merges adjacent <w:r> elements that have identical <w:rPr> properties.

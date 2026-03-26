@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 # Initialize planning files for a new session
 # Usage: ./init-session.sh [project-name]
 

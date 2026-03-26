@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Pack a directory into a DOCX, PPTX, or XLSX file.
 
 Validates with auto-repair, condenses XML formatting, and creates the Office file.

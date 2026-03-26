@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Measure execution speed of a target function or command.
 DO NOT MODIFY after experiment starts — this is the fixed evaluator."""
 

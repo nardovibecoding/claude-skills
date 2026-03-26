@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Accept all tracked changes in a DOCX file using LibreOffice.
 
 Requires LibreOffice (soffice) to be installed.

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Unpack Office files (DOCX, PPTX, XLSX) for editing.
 
 Extracts the ZIP archive, pretty-prints XML files, and optionally:

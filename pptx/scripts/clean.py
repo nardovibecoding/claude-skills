@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Remove unreferenced files from an unpacked PPTX directory.
 
 Usage: python clean.py <unpacked_dir>

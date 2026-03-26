@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """Simplify tracked changes by merging adjacent w:ins or w:del elements.
 
 Merges adjacent <w:ins> elements from the same author into a single element.

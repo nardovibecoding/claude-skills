@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Nardo. AGPL-3.0 — see LICENSE
 """
 Command line tool to validate Office document XML files against XSD schemas and tracked changes.
 
