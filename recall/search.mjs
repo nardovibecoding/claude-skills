@@ -1,25 +1,32 @@
 #!/usr/bin/env node
 /**
  * Hybrid memory search — Vector + BM25 + Recency + Graph + Cross-encoder reranker.
- * Section-level chunking for long docs.
+ * Section-level chunking for long docs. HyDE + PRF query expansion. Feedback log.
  *
  * Usage: node search.mjs "how did we fix the matcher?"
  *        node search.mjs "gbrain" --json    (for hook auto-inject)
  *        node search.mjs "x" --no-rerank    (skip reranker)
+ *        node search.mjs "x" --no-hyde --no-prf   (skip query expansion)
  *
  * Pipeline:
+ *   0. Query expansion:
+ *      - HyDE: short/vague queries (<6 tokens) → MiniMax generates hypothetical
+ *        answer, embedded in place of raw query for vector layer
+ *      - PRF: top-3 BM25 hits' unique terms appended to query for second BM25 pass
  *   1. Split each file body by `##` headings → chunks (max 8/file, 500 chars each)
  *   2. Vector: per-chunk embeddings via all-MiniLM-L6-v2 (file score = max chunk)
  *   3. BM25: TF-IDF with field weighting (name 3x, desc 2x, body 1x) — file-level
  *   4. Recency: mtime-based boost
  *   5. Graph: traverse graph.json for related nodes
- *   6. Fuse: Reciprocal Rank Fusion (k=60) → top 20
+ *   6. Fuse: Reciprocal Rank Fusion (k=60, tunable per-signal weights) → top 20
  *   7. Rerank: cross-encoder ms-marco-MiniLM-L-6-v2 scores (query, doc) pairs → top 5
+ *   8. Log: append {query, top5, signal_ranks} to ~/.claude/.recall_feedback.jsonl
  *
  * Cache: ~/.claude/.memory_embeddings_cache.v2.json (chunk-aware schema)
+ * Weights: ~/.claude/.recall_weights.json (learned over time from feedback)
  */
 
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, appendFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -28,13 +35,19 @@ const PROJECTS_DIR = join(CLAUDE_DIR, "projects");
 const NARDOWORLD_DIR = join(homedir(), "NardoWorld");
 const CACHE_FILE = join(CLAUDE_DIR, ".memory_embeddings_cache.v2.json");
 const GRAPH_FILE = join(homedir(), "telegram-claude-bot", "graphify-out", "graph.json");
+const FEEDBACK_LOG = join(CLAUDE_DIR, ".recall_feedback.jsonl");
+const WEIGHTS_FILE = join(CLAUDE_DIR, ".recall_weights.json");
+const TG_ENV = join(homedir(), "telegram-claude-bot", ".env");
 
 const args = process.argv.slice(2);
 const jsonMode = args.includes("--json");
 const noRerank = args.includes("--no-rerank");
+const noHyde = args.includes("--no-hyde");
+const noPrf = args.includes("--no-prf");
+const noLog = args.includes("--no-log");
 const query = args.filter(a => !a.startsWith("--"))[0];
 if (!query) {
-  console.error("Usage: node search.mjs \"<query>\" [--json] [--no-rerank]");
+  console.error("Usage: node search.mjs \"<query>\" [--json] [--no-rerank|--no-hyde|--no-prf|--no-log]");
   process.exit(1);
 }
 
@@ -42,6 +55,13 @@ const MAX_CHUNKS_PER_FILE = 8;
 const CHUNK_MAX_CHARS = 500;
 const RERANK_CANDIDATES = 20;
 const TOP_K = 5;
+const HYDE_MAX_TOKENS = 6;       // trigger HyDE if raw query ≤ this many tokens
+const PRF_TOP_DOCS = 3;          // use top-N BM25 docs for term expansion
+const PRF_EXPANSION_TERMS = 5;   // add this many high-TF terms
+const HYDE_TIMEOUT_MS = 3500;    // fail-open if MiniMax slow
+
+// Default RRF weights; override via ~/.claude/.recall_weights.json
+const DEFAULT_WEIGHTS = { vector: 1.0, bm25: 1.0, recency: 1.0, graph: 1.0 };
 
 // ---------------------------------------------------------------------------
 // File discovery
@@ -292,21 +312,107 @@ function graphExpand(topFilePaths) {
 }
 
 // ---------------------------------------------------------------------------
-// RRF
+// RRF (weighted)
 // ---------------------------------------------------------------------------
 
-function reciprocalRankFusion(rankedLists, k = 60) {
+function loadWeights() {
+  if (!existsSync(WEIGHTS_FILE)) return { ...DEFAULT_WEIGHTS };
+  try { return { ...DEFAULT_WEIGHTS, ...JSON.parse(readFileSync(WEIGHTS_FILE, "utf-8")) }; }
+  catch { return { ...DEFAULT_WEIGHTS }; }
+}
+
+/**
+ * Weighted RRF: each signal's contribution scaled by its learned weight.
+ * rankedLists = [{list, name}] so we can map weight by signal name.
+ */
+function reciprocalRankFusionWeighted(rankedLists, weights, k = 60) {
   const fused = {};
-  for (const ranked of rankedLists) {
-    for (let rank = 0; rank < ranked.length; rank++) {
-      const idx = ranked[rank].index;
+  for (const { list, name } of rankedLists) {
+    const w = weights[name] ?? 1.0;
+    for (let rank = 0; rank < list.length; rank++) {
+      const idx = list[rank].index;
       if (!fused[idx]) fused[idx] = 0;
-      fused[idx] += 1 / (k + rank + 1);
+      fused[idx] += w * (1 / (k + rank + 1));
     }
   }
   return Object.entries(fused)
     .map(([index, score]) => ({ index: parseInt(index), score }))
     .sort((a, b) => b.score - a.score);
+}
+
+// ---------------------------------------------------------------------------
+// HyDE — generate hypothetical answer via MiniMax for fuzzy queries
+// ---------------------------------------------------------------------------
+
+function readEnvKey(key) {
+  if (process.env[key]) return process.env[key];
+  if (!existsSync(TG_ENV)) return null;
+  for (const line of readFileSync(TG_ENV, "utf-8").split("\n")) {
+    if (line.startsWith(`${key}=`)) return line.slice(key.length + 1).trim();
+  }
+  return null;
+}
+
+async function hydeExpand(rawQuery) {
+  const apiKey = readEnvKey("MINIMAX_API_KEY");
+  if (!apiKey) return null;
+  const prompt = `Write a 2-3 sentence technical note that could be a memo/wiki answer to: "${rawQuery}". Use concrete terms, file paths, function names, or concepts you'd expect. No hedging.`;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), HYDE_TIMEOUT_MS);
+  try {
+    const res = await fetch("https://api.minimax.chat/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "MiniMax-M2.7",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 120,
+        temperature: 0.3,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data?.choices?.[0]?.message?.content?.trim();
+    return text || null;
+  } catch {
+    clearTimeout(t);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PRF — pseudo-relevance feedback: expand query with high-TF terms from top hits
+// ---------------------------------------------------------------------------
+
+const STOP = new Set(("a an the and or but is are was were be been being of to in for on with by at from that this these those it its they them we our their his her him she he i you your yours as it's we're").split(" "));
+
+function prfExpand(rawQuery, bm25Ranked, fileTexts, k = PRF_TOP_DOCS, topTerms = PRF_EXPANSION_TERMS) {
+  if (bm25Ranked.length === 0) return rawQuery;
+  const queryTerms = new Set(tokenize(rawQuery));
+  const termFreq = {};
+  const topDocs = bm25Ranked.slice(0, k);
+  for (const { index } of topDocs) {
+    for (const t of tokenize(fileTexts[index] || "")) {
+      if (STOP.has(t) || queryTerms.has(t) || t.length < 3) continue;
+      termFreq[t] = (termFreq[t] || 0) + 1;
+    }
+  }
+  const picks = Object.entries(termFreq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topTerms)
+    .map(([t]) => t);
+  if (picks.length === 0) return rawQuery;
+  return `${rawQuery} ${picks.join(" ")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Feedback logger — append every query's top-5 + signal ranks
+// ---------------------------------------------------------------------------
+
+function logFeedback(entry) {
+  try { appendFileSync(FEEDBACK_LOG, JSON.stringify(entry) + "\n"); } catch {}
 }
 
 // ---------------------------------------------------------------------------
@@ -348,9 +454,35 @@ async function main() {
     const bodyTxt = fileChunks[i].map(c => c.text).join(" ").slice(0, 3000);
     return `${name} ${name} ${name} ${desc} ${desc} ${bodyTxt}`;
   });
-  const bm25Scores = bm25Search(bm25Docs, query);
-  const bm25Ranked = bm25Scores.map((score, index) => ({ index, score }))
+
+  // Initial BM25 with raw query
+  let bm25Scores = bm25Search(bm25Docs, query);
+  let bm25Ranked = bm25Scores.map((score, index) => ({ index, score }))
     .filter(r => r.score > 0).sort((a, b) => b.score - a.score);
+
+  // PRF: expand query with high-TF terms from top initial hits, re-run BM25
+  let prfQuery = null;
+  if (!noPrf && bm25Ranked.length > 0) {
+    prfQuery = prfExpand(query, bm25Ranked, bm25Docs);
+    if (prfQuery !== query) {
+      const bm25Scores2 = bm25Search(bm25Docs, prfQuery);
+      // Take max per file across original and expanded queries
+      bm25Scores = bm25Scores.map((s, i) => Math.max(s, bm25Scores2[i]));
+      bm25Ranked = bm25Scores.map((score, index) => ({ index, score }))
+        .filter(r => r.score > 0).sort((a, b) => b.score - a.score);
+      process.stderr.write(`[prf] query expanded: +${prfQuery.slice(query.length).trim()}\n`);
+    }
+  }
+
+  // HyDE: generate hypothetical answer for short queries; use it for vector layer
+  const queryTokens = tokenize(query);
+  let hydeText = null;
+  if (!noHyde && queryTokens.length > 0 && queryTokens.length <= HYDE_MAX_TOKENS) {
+    process.stderr.write(`[hyde] short query (${queryTokens.length} tokens) — calling MiniMax...\n`);
+    hydeText = await hydeExpand(query);
+    if (hydeText) process.stderr.write(`[hyde] got ${hydeText.length} chars\n`);
+    else process.stderr.write(`[hyde] failed or unavailable — using raw query\n`);
+  }
 
   // Chunked embeddings
   const cache = loadCache();
@@ -397,8 +529,9 @@ async function main() {
     saveCache(cache);
   }
 
-  // Query vector + per-file max chunk score
-  const [queryVec] = await embed([query]);
+  // Query vector + per-file max chunk score. Use HyDE expansion if available.
+  const vecQueryText = hydeText ? `${query}\n\n${hydeText}` : query;
+  const [queryVec] = await embed([vecQueryText]);
 
   const vectorScores = files.map((f, i) => {
     const entry = cache[f.path];
@@ -417,8 +550,13 @@ async function main() {
   // Recency
   const recencyRank = recencyRanked(files);
 
-  // RRF
-  const fused = reciprocalRankFusion([vectorRanked, bm25Ranked, recencyRank]);
+  // Weighted RRF (per-signal weights loaded from .recall_weights.json)
+  const weights = loadWeights();
+  const fused = reciprocalRankFusionWeighted([
+    { list: vectorRanked, name: "vector" },
+    { list: bm25Ranked, name: "bm25" },
+    { list: recencyRank, name: "recency" },
+  ], weights);
 
   // Graph boost on top-5 neighbors
   const topFilePaths = fused.slice(0, 5).map(r => files[r.index].path);
@@ -481,7 +619,11 @@ async function main() {
   } else {
     console.log(`Query: "${query}"\n`);
     const totalChunks = Object.values(cache).reduce((s, e) => s + (e.chunks?.length || 0), 0);
-    console.log(`  ${files.length} files, ${totalChunks} chunks | BM25 hits: ${bm25Ranked.length} | Graph: ${graphNeighbors.size} | Rerank: ${noRerank ? "skipped" : "on"}\n`);
+    const expand = [];
+    if (hydeText) expand.push("HyDE");
+    if (prfQuery && prfQuery !== query) expand.push("PRF");
+    const expandTag = expand.length ? ` | Expand: ${expand.join("+")}` : "";
+    console.log(`  ${files.length} files, ${totalChunks} chunks | BM25 hits: ${bm25Ranked.length} | Graph: ${graphNeighbors.size} | Rerank: ${noRerank ? "skipped" : "on"}${expandTag}\n`);
 
     for (const r of final) {
       const f = files[r.index];
@@ -498,6 +640,31 @@ async function main() {
       console.log(`  [${label}] ${f.name}`);
       console.log(`  ${f.path}\n`);
     }
+  }
+
+  // Feedback log: append query + signal ranks for each top result. Consumed
+  // offline by tune-weights script to nudge .recall_weights.json.
+  if (!noLog) {
+    const vecRankMap = new Map(vectorRanked.map((r, i) => [r.index, i]));
+    const bm25RankMap = new Map(bm25Ranked.map((r, i) => [r.index, i]));
+    const recencyRankMap = new Map(recencyRank.map((r, i) => [r.index, i]));
+    logFeedback({
+      ts: Date.now(),
+      query,
+      hyde: !!hydeText,
+      prf: prfQuery !== null && prfQuery !== query,
+      reranked: !noRerank,
+      weights,
+      results: final.map(r => ({
+        path: files[r.index].path,
+        score: r.score,
+        rrf: r.rrfScore ?? null,
+        vec_rank: vecRankMap.get(r.index) ?? -1,
+        bm25_rank: bm25RankMap.get(r.index) ?? -1,
+        recency_rank: recencyRankMap.get(r.index) ?? -1,
+        graph: !!r.graphBoosted,
+      })),
+    });
   }
 }
 
