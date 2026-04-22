@@ -1,0 +1,26 @@
+---
+name: watch-video
+description: Analyze a video using Gemini 2.5 Flash. Accepts local file path or URL (X/Twitter, YouTube, etc). Describes product demos, UX flows, and clonable architecture.
+user-invocable: true
+---
+
+You are executing the /watch-video skill.
+
+ARGUMENTS: the video path or URL provided by the user after `/watch-video`.
+
+Steps:
+1. Import and call `gemini_video_analysis` from `llm_client.py` in `~/telegram-claude-bot/`:
+   ```python
+   import sys
+   sys.path.insert(0, str(Path.home() / "telegram-claude-bot"))
+   from llm_client import gemini_video_analysis
+   result = gemini_video_analysis("<path_or_url>")
+   print(result)
+   ```
+   Run this via Bash tool.
+
+2. Present the result directly to the user. No preamble.
+
+If the argument is a URL, yt-dlp downloads it automatically inside `gemini_video_analysis`.
+If the argument is a local file, pass the absolute path.
+If GEMINI_API_KEY is missing, tell the user to add it to `~/telegram-claude-bot/.env`.

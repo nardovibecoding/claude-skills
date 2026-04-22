@@ -1,9 +1,6 @@
 ---
 name: homeinout
-description: |
-  Transfer session between Mac and phone. /home out = transfer to phone (TG).
-  /home in = resume on Mac from phone. Triggers: "homeout", "homein",
-  "transfer to phone", "resume from phone", "switch to mobile".
+description: Transfer session Mac ↔ phone.
 ---
 
 # Home — Session Transfer

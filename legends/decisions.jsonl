@@ -1,0 +1,1 @@
+{"_meta": "Append-only log of legend-panel decisions. One JSON per line. Schema: {ts, mode, question, tags, panel, synthesis, bernard_chose, outcome_noted_at, outcome}"}

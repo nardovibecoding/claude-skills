@@ -1,9 +1,6 @@
 ---
 name: indicatorinout
-description: |
-  Switch voice indicator mode. /indicator plugged = menubar (dual monitor).
-  /indicator unplugged = floating dot (single monitor).
-  Triggers: "plugged", "unplugged", "switch indicator", "menubar indicator", "floating dot".
+description: Voice indicator mode toggle.
 ---
 
 # Voice Indicator Switch

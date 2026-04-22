@@ -34,7 +34,8 @@ Generate and post tweets for @nardovibecoding. All tweets go through voice rules
 ## Flow (all modes)
 
 1. **Calendar check** — read [content-calendar.md](references/content-calendar.md), suggest today's type
-2. **Generate** — apply [voice-rules.md](references/voice-rules.md) and [templates.md](references/templates.md)
+2. **Arc + angle selection** — pick narrative structure from [arc-types.md](references/arc-types.md), layer a framing lens from [angle-bank.md](references/angle-bank.md)
+3. **Generate** — apply [voice-rules.md](references/voice-rules.md) and [templates.md](references/templates.md)
 3. **Humanizer pass** — run content-humanizer, remove all AI patterns
 4. **Anti-pattern check** — scan against [anti-patterns.md](references/anti-patterns.md)
 5. **Hashtag** — read [hashtag-strategy.md](references/hashtag-strategy.md), search X for trending tags, pick 1-2

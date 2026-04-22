@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "updated": "2026-04-20",
+  "_doc": "RRF signal weights for legend panel selection. Edit to tune. Auto-adjusted by feedback log after ~100 entries.",
+  "w_S1_matrix": 1.0,
+  "w_S2_persona_content": 0.8,
+  "w_S3_perspective": 1.0,
+  "w_S4_graph_distance": 0.6,
+  "w_S5_recency_rotation": 0.4,
+  "mode_overrides": {
+    "red-team": {
+      "w_S1_matrix": 0.4,
+      "cautionary_force_multiplier": 2.0
+    },
+    "audit": {
+      "w_S5_recency_rotation": -0.5
+    },
+    "brief": {
+      "w_S5_recency_rotation": 0.0
+    }
+  },
+  "adaptive_rules": {
+    "graph_anchored_q": {"w_S4_graph_distance": 1.5},
+    "domain_novel_q": {"w_S2_persona_content": 1.2, "w_S3_perspective": 1.2},
+    "stale_perspectives": {"w_S3_perspective": 0.3}
+  },
+  "rrf_k": 60
+}

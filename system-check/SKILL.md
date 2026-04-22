@@ -1,6 +1,6 @@
 ---
 name: system-check
-description: Full system health check — Mac + VPS processes, MCP servers, cron jobs, disk, memory, cookies, heartbeat. One command to see everything.
+description: Mac+VPS health snapshot.
 ---
 
 Run a comprehensive system health check across Mac and VPS.

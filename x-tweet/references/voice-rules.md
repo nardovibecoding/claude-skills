@@ -26,6 +26,27 @@ Claude Code is the hero. You're the tour guide.
 9. Share what you learned, not what you achieved
 10. When showing a win, pair it with what went wrong first
 
+## Hook Quality
+
+The first line decides everything. Lead with the broken state — what was wrong before — not the solution. The reader needs to feel the problem before they care about the fix.
+
+- BAD: "Built a knowledge system that matures over time."
+- GOOD: "I had 150 memory files and 218 wiki articles. They couldn't talk to each other."
+
+Always name the destination — what actually changes as a result. A system that "connects two stores" is vague. A system where "a correction you give today is encoded into agent behavior by next week" is concrete.
+
+- BAD: "Built a promotion pipeline for my wiki."
+- GOOD: "A pattern I correct today is in my agent's system prompt by next week. Automatically."
+
+If the story has multiple layers (not just A → B but A → B → C), show the full chain. Cutting it short makes the payoff feel small.
+
+## Bring External Hooks Early
+
+If a notable person/post validates your angle, use it in the first or second tweet — not buried at the end. It frames the reader's expectations and borrows credibility without name-dropping for its own sake.
+
+- BAD: "Built X. [3 tweets later] Oh and Karpathy talked about this."
+- GOOD: "Karpathy described a pattern I'd been building for months. Here's what he didn't mention."
+
 ## Formatting
 
 - Normal capitalization (not all lowercase, not ALL CAPS)
@@ -48,6 +69,19 @@ Claude Code is the hero. You're the tour guide.
 | I'm just a beginner | I don't have a coding background |
 | can't believe this worked | this actually works |
 | no coding background at all | I don't code, CC does |
+
+## Fact-Check Before Publishing
+
+Numbers, model counts, file counts, dates — verify from source, never from memory.
+- BAD: "five models vote on it" (written from recall)
+- GOOD: check the actual script, then write "four models vote, a fifth arbitrates"
+
+## Credit by Full Name
+
+Credit tool creators with their full name, not just the tool name.
+- BAD: "built on Graphify"
+- GOOD: "built on Graphify by Safi Shamsi"
+Reason: full attribution earns goodwill, may earn a retweet, and signals community awareness.
 
 ## Humanizer Checklist (run on every draft)
 

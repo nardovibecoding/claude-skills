@@ -1,9 +1,6 @@
 ---
 name: skill-router
-description: |
-  Switch skill profiles mid-session. Profiles: all, coding, outreach, minimal.
-  Triggers: "coding mode", "outreach mode", "minimal mode", "all skills",
-  "switch profile", "load skills for".
+description: Switch skill profile mid-session.
 ---
 
 # Skill Router — Profile Switching
@@ -15,8 +12,8 @@ Swap active skills mid-session without restarting.
 | Profile | Skills loaded | When |
 |---------|-------------|------|
 | `all` | Everything | Default, general work |
-| `coding` | investigate, review, ship, critic, dependency-tracker, plan-eng-review | Dev/debugging |
-| `outreach` | debate, content-humanizer, eli5, office-hours | BD/content work |
+| `coding` | ship, critic, dependency-tracker | Dev/debugging |
+| `outreach` | debate, content-humanizer, eli5 | BD/content work |
 | `minimal` | chatid, remind, system-check, home | Quick tasks |
 
 ## How to Switch

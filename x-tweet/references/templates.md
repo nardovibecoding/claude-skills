@@ -55,6 +55,48 @@ After main tweet, reply with one of:
 - "[Specific technical detail that power users will bookmark]."
 - "Biggest surprise: [unexpected thing you learned]."
 
+### The Pipeline / System Maturity
+For stories where A → B → C and the payoff is the full chain, not just the last step.
+
+> [The broken state — specific, concrete].
+>
+> [What you built to fix it — name all layers of the chain].
+>
+> [The destination: what actually changes now. Not "it works better" — what specifically is different].
+
+Self-reply: "The part most people skip: [the middle step that makes the chain work]."
+
+### Two X. One Y.
+For stories where two entities (human + AI, two systems, two approaches) share a single resource or space — creates tension from the title alone.
+
+> Two [actors]. One [shared thing].
+>
+> [What that means in practice — one sentence].
+>
+> [The unexpected thing that emerged from the sharing].
+
+Self-reply: "The part I didn't design: [what appeared organically without planning]."
+
+### The Anti-Organization
+For systems where stopping manual effort led to better results. Contrarian to PKM culture.
+
+> I stopped [manual organizing behavior].
+>
+> [Counter-intuitive result]. Here's why.
+>
+> [One-line mechanism: what replaced the manual work].
+
+Self-reply: "The thing most organizers miss: [organizing is the symptom, not the solution]."
+
+### The External Validation Hook
+When a notable person/post validates your angle — use them to open, not close.
+
+> [Notable person] described [X] last week.
+>
+> I'd been building it for months without a name for it.
+>
+> Here's what [they] didn't mention: [your specific angle/addition].
+
 ## Thread Template (3-5 tweets)
 
 **Tweet 1**: Hook + main claim (must stand alone)

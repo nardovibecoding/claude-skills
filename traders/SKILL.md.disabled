@@ -1,0 +1,35 @@
+---
+name: traders
+description: Polymarket trader database. Browse, search, add notable traders categorized by style. /traders to browse, /traders add <url> to save, /traders <category> to filter.
+user-invocable: true
+---
+<traders>
+Manage the Polymarket traders library at `/Users/bernard/.claude/projects/-Users-bernard-polymarket-bot/memory/reference_polymarket_traders.md`.
+
+Based on the user's input:
+
+- **No args (`/traders`)**: Display the full library, organized by category.
+- **With category (`/traders crypto`, `/traders sports`, `/traders whales`, etc.)**: Filter to that section.
+- **`/traders add <polymarket-profile-url>`**:
+  1. Fetch the profile page with WebFetch to get their stats (volume, PnL, trade count, bio)
+  2. Fetch their recent trades from the Data API to determine trading style:
+     ```bash
+     curl -s "https://data-api.polymarket.com/trades?maker_address=<WALLET>&limit=100"
+     ```
+  3. Categorize by betting style:
+     - **Crypto Scalpers**: Mostly Up/Down crypto markets, high frequency
+     - **Sports Bettors**: Team/player outcome markets
+     - **Political Traders**: Election, policy, political figure markets
+     - **Market Makers**: Both sides, spread collection, many small fills
+     - **Insider/Suspicious**: Fresh wallet + large bets + niche markets + wins
+     - **Resolution Snipers**: Buys near resolution at 90¢+
+     - **Whales**: Single positions > $10K
+     - **AI/Bot Traders**: Regular intervals, 24/7 activity, uniform sizing
+  4. Add entry with format: `- [@handle](url) — bio | $vol, $pnl, trades | Style description. Wallet: 0x...`
+  5. Confirm to user with stats summary
+
+- **`/traders search <keyword>`**: Search across all trader entries.
+- **`/traders wallet <address>`**: Look up if a wallet is in the database.
+
+Categories: Crypto Scalpers, Sports Bettors, Political Traders, Market Makers, Insider/Suspicious, Resolution Snipers, Whales, AI/Bot Traders
+</traders>

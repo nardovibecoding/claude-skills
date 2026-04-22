@@ -1,10 +1,6 @@
 ---
 name: "skill-security-auditor"
-description: |
-  Security audit skills before install — scan for malicious code, prompt injection, exfiltration.
-  Triggers: "audit this skill", "is this skill safe", "scan skill", "check before install", "skill security".
-  NOT FOR: general code review (use review), skill cleaning (use skillcleaning), skill evaluation (use extractskill).
-  Produces: PASS/WARN/FAIL verdict with findings and remediation guidance.
+description: Audit skill safety pre-install.
 ---
 
 # Skill Security Auditor

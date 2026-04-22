@@ -1,0 +1,22 @@
+---
+name: repos
+description: Show the curated library of GitHub repos organized by category. Use /repos to browse, /repos <category> to filter, /repos add <url> to save a new one.
+user-invocable: true
+---
+<repos>
+Read the repos library from `/Users/bernard/.claude/projects/-Users-bernard-polymarket-bot/memory/reference_github_repos.md`.
+
+Based on the user's input:
+
+- **No args (`/repos`)**: Display the full library, organized by category headers. Use clean markdown with clickable links.
+- **With category (`/repos sdks`, `/repos bots`, `/repos data`, etc.)**: Filter to just that category section.
+- **`/repos add <github-url>`**: 
+  1. Fetch the URL with WebFetch to get repo description
+  2. Determine the best category (SDKs, Bots, Data, Platforms, AI, Curated Lists — or create a new one if none fit)
+  3. Append the repo to the appropriate section in the memory file
+  4. Update MEMORY.md if needed
+  5. Confirm to the user
+- **`/repos search <keyword>`**: Search across all repo names and descriptions for the keyword.
+
+Keep output concise. Show repos as `- [owner/repo](url) — description` format.
+</repos>

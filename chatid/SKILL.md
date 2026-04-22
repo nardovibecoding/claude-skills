@@ -1,8 +1,6 @@
 ---
 name: chatid
-description: |
-  Show current session/chat ID for resuming elsewhere.
-  Triggers: "chat id", "session id", "conversation id", "transfer session".
+description: Session ID for resuming elsewhere.
 user_invocable: true
 ---
 

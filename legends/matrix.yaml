@@ -1,0 +1,444 @@
+# Legend fitness matrix — editable. Scores via primary/secondary tag lists.
+# 17 tags: BUILD EXIT PIVOT TIMING CAPITAL NARRATIVE CRISIS PEOPLE CONTENT POLITICS NEGO ETHICAL LEARNING AESTHETICS LEGACY HEALTH FAMILY
+# status: active | retired | silent | offline-deceased | offline-imprisoned
+# era_snapshot: which version of this person the panel uses
+# scale: micro | small-biz | corporate | civilization
+# horizon: weeks | years | decades | generations
+
+version: 1
+updated: 2026-04-20
+
+legends:
+
+  # BUILD
+  steve-jobs:
+    primary: [BUILD, CONTENT, AESTHETICS, PEOPLE]
+    secondary: [NARRATIVE, PIVOT, EXIT, LEGACY]
+    domain: [consumer-tech, hardware, design]
+    status: offline-deceased
+    era_snapshot: 1997-2011-return-era
+    language: [english]
+    scale: civilization
+    horizon: decades
+
+  elon-musk:
+    primary: [BUILD, PIVOT, CAPITAL, NEGO]
+    secondary: [CRISIS, LEARNING, NARRATIVE, PEOPLE]
+    domain: [hardware, aerospace, ai, physics-first]
+    status: active
+    era_snapshot: 2020-present
+    language: [english]
+    scale: civilization
+    horizon: decades
+
+  lei-jun:
+    primary: [BUILD, TIMING, PEOPLE, NEGO]
+    secondary: [NARRATIVE, CONTENT, CAPITAL, PIVOT]
+    domain: [consumer-tech, china-market, hardware]
+    status: active
+    era_snapshot: post-xiaomi-2010-present
+    language: [mandarin, english]
+    scale: corporate
+    horizon: years
+
+  jack-ma:
+    primary: [BUILD, NARRATIVE, PEOPLE, TIMING]
+    secondary: [POLITICS, LEGACY, LEARNING, PIVOT]
+    domain: [e-commerce, china-market, ecosystem]
+    status: silent
+    era_snapshot: 1999-2020-pre-ant-suspension
+    language: [mandarin, english]
+    scale: civilization
+    horizon: decades
+
+  branson:
+    primary: [BUILD, NARRATIVE, CRISIS, PEOPLE]
+    secondary: [CONTENT, NEGO, ETHICAL, LEGACY]
+    domain: [consumer-brands, aviation, adventure]
+    status: active
+    era_snapshot: virgin-empire-mature
+    language: [english]
+    scale: corporate
+    horizon: decades
+
+  peter-lam:
+    primary: [BUILD, NARRATIVE, TIMING, CAPITAL]
+    secondary: [POLITICS, CONTENT, AESTHETICS, LEGACY]
+    domain: [hk-property, entertainment, china-market]
+    status: active
+    era_snapshot: post-inheritance-mature
+    language: [cantonese, mandarin, english]
+    scale: corporate
+    horizon: decades
+
+  herjavec:
+    primary: [NEGO, NARRATIVE, CRISIS, LEARNING]
+    secondary: [PEOPLE, BUILD, CAPITAL, CONTENT]
+    domain: [cybersecurity, sales, immigrant-hustle]
+    status: active
+    era_snapshot: post-shark-tank
+    language: [english]
+    scale: small-biz
+    horizon: years
+
+  # MONEY
+  li-ka-shing:
+    primary: [EXIT, TIMING, CAPITAL, CRISIS]
+    secondary: [NEGO, POLITICS, LEGACY, LEARNING]
+    domain: [hk-property, ports, diversified-conglomerate]
+    status: retired
+    era_snapshot: 1990-2018-active-era
+    language: [cantonese, english]
+    scale: civilization
+    horizon: generations
+
+  masayoshi-son:
+    primary: [CAPITAL, BUILD, NEGO, PEOPLE]
+    secondary: [TIMING, CRISIS, LEGACY, LEARNING]
+    domain: [venture-capital, ai, telecom]
+    status: active
+    era_snapshot: softbank-vision-fund-era
+    language: [japanese, english]
+    scale: civilization
+    horizon: generations
+
+  dalio:
+    primary: [CAPITAL, LEARNING, CRISIS, PEOPLE]
+    secondary: [POLITICS, NEGO, TIMING, LEGACY]
+    domain: [macro, hedge-fund, systems-thinking]
+    status: retired
+    era_snapshot: bridgewater-mature
+    language: [english]
+    scale: civilization
+    horizon: generations
+
+  buffett:
+    primary: [CAPITAL, EXIT, PEOPLE, LEARNING]
+    secondary: [TIMING, ETHICAL, LEGACY, NEGO]
+    domain: [value-investing, insurance, consumer-brands]
+    status: active
+    era_snapshot: berkshire-mature
+    language: [english]
+    scale: civilization
+    horizon: generations
+
+  cho-yan-chiu:
+    primary: [CAPITAL, TIMING, EXIT, LEARNING]
+    secondary: [CRISIS, LEGACY, CONTENT]
+    domain: [hk-stocks, retail-investor, trend-following]
+    status: offline-deceased
+    era_snapshot: 1980s-2010s
+    language: [cantonese]
+    scale: small-biz
+    horizon: years
+
+  webb:
+    primary: [ETHICAL, POLITICS, NEGO, CRISIS]
+    secondary: [LEARNING, LEGACY, CAPITAL]
+    domain: [hk-stocks, corporate-governance, activism]
+    status: offline-deceased
+    era_snapshot: 1998-2026-webb-site-era
+    language: [english]
+    scale: corporate
+    horizon: decades
+
+  icahn:
+    primary: [NEGO, CAPITAL, CRISIS, EXIT]
+    secondary: [POLITICS, TIMING, PEOPLE]
+    domain: [activist-investing, corporate-raids]
+    status: active
+    era_snapshot: 1980s-present
+    language: [english]
+    scale: civilization
+    horizon: decades
+
+  # HUSTLE
+  daliu:
+    primary: [TIMING, CAPITAL, CRISIS, NEGO]
+    secondary: [PEOPLE, NARRATIVE, AESTHETICS, EXIT]
+    domain: [hk-property, distressed-assets, art-diamonds]
+    status: retired  # hk-fugitive-since-2014
+    era_snapshot: 1980s-2014
+    language: [cantonese]
+    scale: corporate
+    horizon: years
+    cautionary: [law-as-terrain, political-protection-expiry]
+
+  alvin-chau:
+    primary: [BUILD, POLITICS, NEGO, PEOPLE]
+    secondary: [NARRATIVE, CRISIS]
+    domain: [macau-junket, grey-zone-monopoly]
+    status: offline-imprisoned
+    era_snapshot: 2007-2021
+    language: [cantonese, mandarin]
+    scale: corporate
+    horizon: years
+    cautionary: [grey-zone-regulator-arrival, political-protection-expiry]
+    ethical_flag: true
+
+  law-siu-fai:
+    primary: [TIMING, NEGO, NARRATIVE, CAPITAL]
+    secondary: [CRISIS, PEOPLE, EXIT]
+    domain: [hk-property, leveraged-speculation]
+    status: offline-deceased
+    era_snapshot: 1990s-boom-bust
+    language: [cantonese]
+    scale: corporate
+    horizon: weeks
+    cautionary: [borrowed-leverage-fragility, face-credit-collapse]
+
+  richard-li:
+    primary: [BUILD, NARRATIVE, TIMING, NEGO]
+    secondary: [POLITICS, CAPITAL, PEOPLE, FAMILY]
+    domain: [telecom, insurance, hk-business]
+    status: active
+    era_snapshot: pccw-through-present
+    language: [cantonese, english]
+    scale: civilization
+    horizon: decades
+
+  cecil-chao:
+    primary: [AESTHETICS, CAPITAL, TIMING, FAMILY]
+    secondary: [BUILD, NARRATIVE, PEOPLE]
+    domain: [hk-property, architecture]
+    status: active
+    era_snapshot: 1980s-present
+    language: [cantonese, english]
+    scale: corporate
+    horizon: decades
+    cautionary: [personal-happiness-overrides-others-autonomy]
+
+  albert-yeung:
+    primary: [PEOPLE, CRISIS, NARRATIVE, BUILD]
+    secondary: [CONTENT, NEGO, LEGACY, TIMING]
+    domain: [hk-entertainment, jewelry, property]
+    status: active
+    era_snapshot: emperor-group-mature
+    language: [cantonese, mandarin]
+    scale: corporate
+    horizon: decades
+
+  cuban:
+    primary: [BUILD, LEARNING, NEGO, NARRATIVE]
+    secondary: [CAPITAL, CONTENT, PEOPLE, PIVOT]
+    domain: [tech-disruption, sports-ownership, sales]
+    status: active
+    era_snapshot: post-broadcast-com-era
+    language: [english]
+    scale: corporate
+    horizon: years
+
+  ricky-wong:
+    primary: [BUILD, CRISIS, PEOPLE, PIVOT]
+    secondary: [NARRATIVE, CONTENT, TIMING, LEGACY]
+    domain: [hk-telecom, hk-media, e-commerce]
+    status: active
+    era_snapshot: post-hktv-license-rejection
+    language: [cantonese]
+    scale: corporate
+    horizon: decades
+
+  edwin-lee:
+    primary: [EXIT, PIVOT, TIMING, CAPITAL]
+    secondary: [CRISIS, NARRATIVE, LEARNING, PEOPLE]
+    domain: [hk-commercial-property, sme-advisory]
+    status: active
+    era_snapshot: present
+    language: [cantonese, english]
+    scale: small-biz
+    horizon: years
+
+  # CONTRARIAN
+  chow-hin:
+    primary: [CAPITAL, ETHICAL, LEARNING, NEGO]
+    secondary: [POLITICS, TIMING, EXIT]
+    domain: [hk-small-cap, market-operator-logic]
+    status: active
+    era_snapshot: present
+    language: [cantonese]
+    scale: small-biz
+    horizon: years
+
+  muddy-waters:
+    primary: [ETHICAL, LEARNING, CRISIS, NARRATIVE]
+    secondary: [POLITICS, CAPITAL, PEOPLE]
+    domain: [short-selling, china-fraud-research]
+    status: active
+    era_snapshot: 2010-present
+    language: [english, mandarin]
+    scale: corporate
+    horizon: years
+
+  sbf:
+    primary: [CAPITAL, NEGO, NARRATIVE, CRISIS]
+    secondary: []
+    domain: [crypto, utilitarian-ethics, effective-altruism]
+    status: offline-imprisoned
+    era_snapshot: ftx-2019-2022
+    language: [english]
+    scale: civilization
+    horizon: years
+    cautionary: [no-floor-utilitarian-EV, customer-funds-misuse]
+    ethical_flag: true
+
+  thiel:
+    primary: [BUILD, LEARNING, NARRATIVE, POLITICS]
+    secondary: [CAPITAL, PEOPLE, LEGACY, PIVOT]
+    domain: [venture-capital, contrarian-philosophy, monopoly-theory]
+    status: active
+    era_snapshot: 2014-present-zero-to-one
+    language: [english]
+    scale: civilization
+    horizon: decades
+
+  leopold:
+    primary: [LEARNING, POLITICS, NARRATIVE, CAPITAL]
+    secondary: [TIMING, LEGACY, CRISIS]
+    domain: [ai, situational-awareness, scaling-laws]
+    status: active
+    era_snapshot: 2024-situational-awareness
+    language: [english]
+    scale: civilization
+    horizon: years
+
+  # STAGE
+  dayo-wong:
+    primary: [CONTENT, NARRATIVE, LEARNING, LEGACY]
+    secondary: [POLITICS, PEOPLE, CRISIS, AESTHETICS]
+    domain: [cantonese-comedy, philosophy, hk-culture]
+    status: retired  # stand-up retired 2018, films active
+    era_snapshot: 1990-2018-standup-era
+    language: [cantonese]
+    scale: small-biz
+    horizon: decades
+
+  wyman-wong:
+    primary: [CONTENT, AESTHETICS, NARRATIVE, LEGACY]
+    secondary: [PEOPLE, PIVOT, LEARNING, FAMILY]
+    domain: [cantopop-lyrics, fashion-critique]
+    status: active
+    era_snapshot: 2000-present
+    language: [cantonese]
+    scale: small-biz
+    horizon: decades
+
+  lam-jik:
+    primary: [CONTENT, NARRATIVE, AESTHETICS, LEGACY]
+    secondary: [HEALTH, PEOPLE, LEARNING, FAMILY]
+    domain: [cantopop-lyrics, buddhism, mental-health]
+    status: active
+    era_snapshot: post-3000-songs-mature
+    language: [cantonese, mandarin]
+    scale: small-biz
+    horizon: generations
+
+  stephen-chow:
+    primary: [CONTENT, AESTHETICS, PEOPLE, LEGACY]
+    secondary: [NARRATIVE, PIVOT, LEARNING, CRISIS]
+    domain: [hk-film, mo-lei-tau-comedy, perfectionist-direction]
+    status: active
+    era_snapshot: post-2010-director-era
+    language: [cantonese, mandarin]
+    scale: corporate
+    horizon: decades
+
+  patrick-tse:
+    primary: [NARRATIVE, AESTHETICS, PEOPLE, HEALTH]
+    secondary: [CONTENT, LEGACY, FAMILY, CRISIS]
+    domain: [hk-film-legend, longevity-performance]
+    status: active
+    era_snapshot: age-89-mature
+    language: [cantonese]
+    scale: small-biz
+    horizon: generations
+
+  natalis-chan:
+    primary: [CRISIS, PEOPLE, NARRATIVE, TIMING]
+    secondary: [CONTENT, FAMILY, CAPITAL, AESTHETICS]
+    domain: [hk-entertainment, gambling-recovery, luck-cosmology]
+    status: active
+    era_snapshot: post-2-bankruptcies-mature
+    language: [cantonese]
+    scale: small-biz
+    horizon: decades
+
+  eric-tsang:
+    primary: [PEOPLE, NEGO, NARRATIVE, CONTENT]
+    secondary: [POLITICS, CRISIS, LEARNING, LEGACY]
+    domain: [hk-entertainment, network-capital, tvb]
+    status: active
+    era_snapshot: tvb-chairman-era
+    language: [cantonese, mandarin]
+    scale: corporate
+    horizon: decades
+
+  # POLITICS
+  jiang-zemin:
+    primary: [POLITICS, NARRATIVE, NEGO, PEOPLE]
+    secondary: [CONTENT, LEGACY, LEARNING, CRISIS]
+    domain: [ccp-leadership, international-diplomacy]
+    status: offline-deceased
+    era_snapshot: 1989-2002-presidency
+    language: [mandarin, english, russian, italian]
+    scale: civilization
+    horizon: generations
+
+  trump:
+    primary: [NARRATIVE, NEGO, POLITICS, CRISIS]
+    secondary: [PEOPLE, CONTENT, TIMING, BUILD]
+    domain: [us-politics, brand-building, attention-economy]
+    status: active
+    era_snapshot: post-2024-reelection
+    language: [english]
+    scale: civilization
+    horizon: years
+
+  stephen-shiu:
+    primary: [LEARNING, POLITICS, NARRATIVE, CONTENT]
+    secondary: [CRISIS, LEGACY, TIMING]
+    domain: [hk-commentary, history-pattern-matching]
+    status: active
+    era_snapshot: youtube-exile-era
+    language: [cantonese, mandarin]
+    scale: small-biz
+    horizon: decades
+
+  miles-guo:
+    primary: [NARRATIVE, POLITICS, CRISIS, PEOPLE]
+    secondary: []
+    domain: [exile-politics, fraud-as-community]
+    status: offline-imprisoned
+    era_snapshot: 2017-2024
+    language: [mandarin, english]
+    scale: corporate
+    horizon: years
+    cautionary: [persecution-brand-to-fraud, information-weaponization]
+    ethical_flag: true
+
+  # UNCATEGORIZED
+  munger:
+    primary: [LEARNING, ETHICAL, CAPITAL, PEOPLE]
+    secondary: [EXIT, LEGACY, NEGO, POLITICS]
+    domain: [mental-models, value-investing, inversion]
+    status: offline-deceased
+    era_snapshot: berkshire-vice-chairman-mature
+    language: [english]
+    scale: civilization
+    horizon: generations
+
+  naval:
+    primary: [LEARNING, BUILD, NARRATIVE, CAPITAL]
+    secondary: [HEALTH, FAMILY, LEGACY, CONTENT]
+    domain: [startup-philosophy, permissionless-leverage, happiness]
+    status: active
+    era_snapshot: 2018-present-twitter-era
+    language: [english]
+    scale: small-biz
+    horizon: generations
+
+# Coverage scoring rules:
+# primary tag match = 5
+# secondary tag match = 3
+# no match = 1 (still accessible but low weight)
+# cautionary-pattern trigger = force-include as warning voice regardless of score
+# ethical_flag + ETHICAL tag question = exclude by default, include only in red-team mode

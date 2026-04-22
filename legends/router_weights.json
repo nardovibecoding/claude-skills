@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "updated": "2026-04-20",
+  "_doc": "Intent-classification weights for /legends <Q> router. Learned over time from feedback log. Edit to tune.",
+  "intent_keywords": {
+    "DECIDE-BINARY": {
+      "should": 1.0,
+      "ok to": 1.0,
+      "can i": 0.9,
+      "yes or no": 1.0,
+      "做唔做": 1.0,
+      "得唔得": 1.0,
+      "可唔可以": 0.9,
+      "要唔要": 0.9
+    },
+    "DECIDE-MULTI": {
+      "or": 0.7,
+      "pick": 0.8,
+      "which": 0.9,
+      "邊個好": 1.0,
+      "揀邊個": 1.0,
+      "定": 0.8
+    },
+    "STRESS-TEST": {
+      "risks": 1.0,
+      "what could go wrong": 1.0,
+      "worst case": 1.0,
+      "attack": 0.8,
+      "kill": 0.6,
+      "fail": 0.8,
+      "blow up": 1.0,
+      "黐線": 1.0,
+      "唔得嘅": 0.9,
+      "出事點算": 1.0,
+      "危險": 0.9
+    },
+    "REFLECT-PAST": {
+      "last time": 1.0,
+      "was i right": 1.0,
+      "looking back": 1.0,
+      "audit": 1.0,
+      "上次": 1.0,
+      "冇錯到": 0.9,
+      "返去睇": 0.9
+    },
+    "QUICK-CHECK": {
+      "tldr": 1.0,
+      "quick": 0.9,
+      "gut check": 1.0,
+      "just tell me": 1.0,
+      "睇下": 1.0,
+      "等陣先": 0.9,
+      "快啲": 0.9
+    },
+    "TEACH-ME": {
+      "why": 0.7,
+      "explain": 1.0,
+      "how does": 0.9,
+      "點解": 1.0,
+      "教我": 1.0,
+      "解釋吓": 1.0
+    },
+    "REFRESH": {
+      "refresh": 1.0,
+      "update": 0.7,
+      "brief": 1.0,
+      "re-read": 1.0,
+      "更新": 1.0,
+      "睇返": 0.8
+    }
+  },
+  "context_bias": {
+    "mid-decision": {"decide": 0.2},
+    "post-audit": {"express": 0.15},
+    "post-panel-follow-up": {"express": 0.25},
+    "emotional-fear": {"decide": 0.1},
+    "emotional-excitement": {"red-team": 0.15}
+  },
+  "language_detection": {
+    "cantonese_markers": ["嘅", "咗", "啲", "嚟", "咁", "喺", "唔", "冇", "點", "畀", "邊"],
+    "mandarin_markers": ["的", "了", "是", "吗", "吧", "啊"],
+    "english_default": true
+  },
+  "tie_threshold_percent": 15,
+  "vague_query_token_threshold": 6
+}

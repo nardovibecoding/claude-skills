@@ -17,6 +17,15 @@
 - "Let me tell you about..." — preamble
 - "Here's the thing:" — AI pattern
 
+## Framing Anti-Patterns
+
+- **Incomplete chain** — describing a system with 3 layers but only showing 2. If the story ends at "memory → wiki" when the real payoff is "memory → wiki → system prompt → agent behavior changes," the tweet undersells the point.
+- **Solution without destination** — "built a promotion pipeline" means nothing without "so now corrections from last Tuesday are in the agent's behavior today."
+- **External hook too late** — mentioning Karpathy / notable validator in tweet 4 of 5 instead of tweet 1. Use it to open the frame, not close it.
+- **Boring open** — starting with what you built instead of what was broken. The broken state is the hook.
+- **Buried payoff** — the most powerful insight is the last tweet or the last paragraph. In tweets, that line IS the hook. If you have a line like "it shows me what I apparently believe, based on what I keep doing" — that's tweet 1, not the conclusion.
+- **Vague payoff** — "the system now works better" instead of a specific, concrete result the reader can picture.
+
 ## Content Anti-Patterns
 
 - Posting outside 8-10am or 6-8pm EST without good reason

@@ -1,0 +1,85 @@
+---
+name: listing-research
+description: Research a crypto token for exchange listing support. Fact-checks all claims, generates 1-page PDF+DOCX on Desktop. Triggers: "listing research", "listing support", "why list", "exchange listing"
+user-invocable: true
+---
+
+# Token Listing Research Skill
+
+Research a crypto token/project and generate a fact-checked 1-page listing support brief (PDF + DOCX).
+
+## Usage
+`/listing-research <TOKEN> (<PROJECT_NAME>)`
+Example: `/listing-research XNT neptuneprivacy`
+
+## Process — STRICT ORDER
+
+### Phase 1: Research (3 background agents max)
+
+Launch up to 3 background agents in parallel:
+
+**Agent 1 — Project & Tech:**
+- Search for official website, whitepaper, GitHub
+- What the project does, tech stack, key features
+- Team members, backers, academic credentials
+- Tokenomics: supply, emission, premine, distribution
+
+**Agent 2 — Market & Exchange:**
+- Current price, volume, market cap from CoinMarketCap
+- Which exchanges ACTUALLY list it for trading (not just price pages)
+- Which aggregators track the price (separate from trading)
+- Any pending listings (verify with official sources)
+
+**Agent 3 — Community & Social:**
+- Twitter/X presence, follower engagement
+- Discord, Telegram, Reddit — verify each actually exists
+- BitcoinTalk, Medium, community articles
+- Influencer mentions, sentiment
+
+### Phase 2: Fact-Check (BEFORE building docs)
+
+Go through EVERY claim from the research and categorize:
+
+- **CONFIRMED** — verified from primary source (official site, GitHub, exchange page)
+- **UNCONFIRMED** — mentioned in secondary sources but not independently verified
+- **FALSE** — contradicted by evidence
+
+**Fact-check rules:**
+- "Listed on X exchange" = you can TRADE the token there. A price page is NOT a listing.
+- "X commits on GitHub" — if it's a fork, note that commits are inherited. Report fork-specific activity separately.
+- Discord/Telegram member counts — only include if independently verifiable
+- Reddit subs — verify the sub exists and has recent activity
+- Team credentials (PhDs, affiliations) — verify against personal sites or institutional pages
+- Price/volume/ATH — always note these are snapshots and will change
+- ATH figures — cross-check at least 2 aggregators, note discrepancies
+
+### Phase 3: Generate Documents
+
+Present the fact-check results to the user first. Then generate:
+
+**PDF** at `~/Desktop/{TOKEN}_Listing_Support.pdf`
+
+Concise 1-pager with these sections:
+- What is [Project] ($TOKEN)
+- Fair Launch & Tokenomics
+- Development Activity
+- Market & Community
+- Why Now
+
+**Document rules:**
+- Only include CONFIRMED claims
+- UNCONFIRMED claims may be included only with "(unverified)" qualifier
+- Never include FALSE claims
+- Use precise language: "traded on" vs "price tracked on"
+- For forked repos, say "open-source codebase" not raw commit counts
+- No fluff, no hype words, only facts
+- Footer with date and sources
+
+### Phase 4: Review
+
+Read the generated PDF back and do a final stranger test:
+- Would someone at an exchange be misled by any bullet?
+- Is every claim defensible if challenged?
+- Are trading venues clearly distinguished from price trackers?
+
+Flag any remaining issues to the user.
