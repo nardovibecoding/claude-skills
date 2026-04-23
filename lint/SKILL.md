@@ -65,12 +65,30 @@ Header: `# Pending lessons — review and apply next interactive /lint`
 ### Phase 5b (unattended): Memory → rules scoring
 Score all actionable memory entries (Durability + Impact + Scope, 0-3 each, threshold ≥7/9 — not ≥6).
 Write candidates scoring ≥7 to: `$MEMO_DIR/lint-rules-candidates-$TODAY.md`
+
+**SCOPE ROUTING (mandatory before setting Proposed target):**
+Classify rule text by keyword match. First match wins:
+
+| Keywords in rule text | Target |
+|---|---|
+| `kalshi`, `polymarket`, `manifold`, `hel`, `london`, `pm-bot`, `pm-london`, `prediction market`, `clobStream`, `whale`, `KMM` | `~/.claude/rules/pm-bot.md` |
+| `agent`, `strict-plan`, `strict-execute`, `strict-research`, `strict-explore`, `strict-review`, `frontmatter`, `subagent_type`, `YAML` (agent context) | `~/.claude/rules/agents.md` |
+| `/ship`, `ship phase`, `SPEC phase`, `PLAN phase`, `EXECUTE phase`, `LAND phase`, `MONITOR phase`, `OUTPUT CONTRACT` | `~/.claude/rules/ship.md` |
+| `hook`, `guard`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop hook` | `~/.claude/rules/hooks.md` (create if missing) |
+| `skill`, `SKILL.md`, `skill-router`, `.disabled` | `~/.claude/rules/skills.md` (create if missing) |
+| `dagou`, `BSC`, `KOL`, `S5`, `sniper` | `~/.claude/rules/dagou.md` (create if missing) |
+| **No keyword match AND** rule is cross-cutting discipline (decide/ship/plan/communicate) | `~/.claude/CLAUDE.md` |
+| **No keyword match AND** unclear scope | flag for MANUAL routing — do NOT default to CLAUDE.md |
+
+Hard rule: if ANY project keyword matches, NEVER propose CLAUDE.md. CLAUDE.md is for universal only.
+
 Format per candidate:
 ```
 ## <entry title>
 Score: D<n>/I<n>/S<n> = <total>/9
 Source: <memory file>
-Proposed target: CLAUDE.md | .claude/rules/<topic>.md | ~/.claude/CLAUDE.md
+Scope keywords detected: <list or "none">
+Proposed target: <resolved path per routing table above>
 > <rule text — imperative form>
 ```
 
@@ -201,8 +219,12 @@ du -sh ~/.claude/skills/*/ | sort -rh
 ls -d ~/.claude/skills/*/ | wc -l
 ```
 
-### 6b: Duplicate detection
-Check for skills with overlapping triggers or identical purpose. Flag and recommend which to keep.
+### 6b: Duplicate detection + trigger overlap audit
+Extract every `Triggers:` line from all SKILL.md files. Tokenize trigger phrases. Flag:
+- Identical trigger phrase in 2+ skills (hard conflict — ambiguous routing)
+- Substring overlap ≥80% (soft conflict — likely one skill obsoletes the other)
+- Same purpose stated in description despite different names
+Report table: skill A | skill B | overlap type | recommended keep. Overlapping triggers = unpredictable skill routing, must resolve.
 
 ### 6c: Broken script detection
 ```bash
