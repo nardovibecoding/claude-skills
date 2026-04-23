@@ -1,6 +1,6 @@
 ---
 name: x-tweet
-description: "Generate, draft, and post tweets for @nardovibecoding via X API. Vibecoding journey with Claude Code. Casual-confident tone. Auto-humanizer, engagement optimization, content calendar, trending hashtag search, thread support, draft queue, performance tracking."
+description: "Generate, draft, and post tweets for @nardovibecoding via X API. Vibecoding journey with Claude Code. Casual-confident tone. Auto-humanizer, engagement optimization, content calendar, trending hashtag search, draft queue, performance tracking. Single tweets only, 280 char max — NO THREADS."
 triggers:
   - "tweet"
   - "post to x"
@@ -27,7 +27,6 @@ Generate and post tweets for @nardovibecoding. All tweets go through voice rules
 | `/tweet hot` | Search X for trending vibecoding/CC topics, suggest angles |
 | `/tweet draft [topic]` | Generate and save to queue, don't post |
 | `/tweet queue` | View saved drafts, pick one to post |
-| `/tweet thread [topic]` | Generate 3-5 tweet thread |
 | `/tweet stats` | Pull metrics on recent tweets, identify patterns |
 | `/tweet engage` | Check replies, flag big accounts, suggest responses |
 

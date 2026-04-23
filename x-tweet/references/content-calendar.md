@@ -5,11 +5,11 @@
 | Day | Type | Template | Example |
 |---|---|---|---|
 | Mon | Build Update | Build Update | "Put together a security scanner this weekend. Catches 60 patterns. Claude Code wrote most of it." |
-| Tue | Workflow Reveal | Thread (3-5) | "How I set up Claude Code for multi-agent work. Thread:" |
+| Tue | Workflow Reveal | Single | "Set up Claude Code for multi-agent work. Each agent owns one phase. Build faster than I can review." |
 | Wed | Hot Take | Hot Take | "In vibecoding, the code is the easy part. Vision matters. Taste matters." |
 | Thu | Tool Discovery | Tool Rec | "Been using [MCP server] for a week. Makes Claude Code actually remember context." |
 | Fri | Weekly Metrics | Metric | "This week: 3 skills updated, 1 new pipeline, 2 bugs caught by my own scanner." |
-| Sat | Deep Dive | Thread (3-5) | "Why I switched from OpenClaw to Claude Code. Thread:" |
+| Sat | Deep Dive | Single | "Switched from OpenClaw to Claude Code. Hook system + skills beats plain prompts every time." |
 | Sun | Community | Question + replies | Engage with others. Reply to everything. No original posts required. |
 
 ## Rules

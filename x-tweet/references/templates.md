@@ -97,21 +97,15 @@ When a notable person/post validates your angle — use them to open, not close.
 >
 > Here's what [they] didn't mention: [your specific angle/addition].
 
-## Thread Template (3-5 tweets)
-
-**Tweet 1**: Hook + main claim (must stand alone)
-**Tweet 2**: The backstory / why this matters
-**Tweet 3**: The specific how (tool, technique, approach)
-**Tweet 4**: The surprise / what went wrong / unexpected lesson
-**Tweet 5**: Question or call to action
-
 ## Content Calendar Alignment
 
 Use the template that matches today's content type:
 - Mon (Build Update): Build Update or Metric template
-- Tue (Workflow Reveal): Thread template
+- Tue (Workflow Reveal): Tool Rec or Build Update template (single tweet)
 - Wed (Hot Take): Hot Take template
 - Thu (Tool Discovery): Tool Rec template
 - Fri (Weekly Metrics): Metric template
-- Sat (Deep Dive): Thread template
+- Sat (Deep Dive): Hot Take or Metric template (single tweet, compress to punch line)
 - Sun (Community): Question template + heavy replying
+
+All tweets are single tweets, 280 char max. NO THREADS.

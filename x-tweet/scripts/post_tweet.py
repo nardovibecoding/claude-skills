@@ -56,6 +56,9 @@ def post_tweet(
     media_path: Optional[str] = None,
 ) -> dict:
     """Post a tweet. Returns tweet data."""
+    if len(text) > 280:
+        raise ValueError(f"Tweet exceeds 280 chars ({len(text)}). No threads — trim first.")
+
     client = get_client()
 
     kwargs: dict = {}

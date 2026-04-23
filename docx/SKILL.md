@@ -61,6 +61,8 @@ python scripts/accept_changes.py input.docx output.docx
 
 Generate .docx files with JavaScript, then validate. Install: `npm install -g docx`
 
+**Node module resolution (REQUIRED):** global npm modules need `NODE_PATH` set or `require('docx')` fails. Run JS via: `NODE_PATH=$(npm root -g) node your-script.js`. Skip this and every new-doc script crashes on line 1.
+
 ### Setup
 ```javascript
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ImageRun,

@@ -12,6 +12,13 @@ description: |
   MODES: new (default) / audit / continue / big-systemd.
 
   Phase files loaded lazily — only current phase in context.
+verified_at: 2026-04-23
+documents:
+  - /Users/bernard/.claude/skills/ship/phases/bot/01-spec.md
+  - /Users/bernard/NardoWorld/meta/phase4_scope.md
+  - /Users/bernard/NardoWorld/meta/phase5_scope.md
+  - /Users/bernard/NardoWorld/meta/phase6_scope.md
+  - /Users/bernard/NardoWorld/meta/phase7_scope.md
 ---
 
 # /ship — Build+Ship Ritual

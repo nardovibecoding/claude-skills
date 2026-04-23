@@ -228,13 +228,11 @@ Report table: skill A | skill B | overlap type | recommended keep. Overlapping t
 
 ### 6c: Broken script detection
 ```bash
-for skill in ~/.claude/skills/*/; do
-  for py in "$skill"scripts/*.py 2>/dev/null; do
-    python3 -c "import py_compile; py_compile.compile('$py', doraise=True)" 2>&1 || echo "BROKEN: $py"
-  done
-  for sh in "$skill"scripts/*.sh 2>/dev/null; do
-    bash -n "$sh" 2>&1 || echo "BROKEN: $sh"
-  done
+find ~/.claude/skills -path '*/scripts/*.py' -print 2>/dev/null | while read -r py; do
+  python3 -c "import py_compile; py_compile.compile('$py', doraise=True)" 2>&1 || echo "BROKEN: $py"
+done
+find ~/.claude/skills -path '*/scripts/*.sh' -print 2>/dev/null | while read -r sh; do
+  bash -n "$sh" 2>&1 || echo "BROKEN: $sh"
 done
 ```
 
