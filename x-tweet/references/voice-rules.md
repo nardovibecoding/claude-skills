@@ -83,12 +83,12 @@ Credit tool creators with their full name, not just the tool name.
 - GOOD: "built on Graphify by Safi Shamsi"
 Reason: full attribution earns goodwill, may earn a retweet, and signals community awareness.
 
-## Humanizer Checklist (run on every draft)
+## Humanizer — delegate to content-humanizer skill
 
-Before posting, verify:
-- [ ] No AI filler words (delve, crucial, leverage, navigate, robust)
-- [ ] No hedging (it's important to note, it's worth mentioning)
-- [ ] Sentence length varies (not all 18-22 words)
-- [ ] At least one specific detail (number, tool name, time)
-- [ ] No parallel structure across 3+ lines (breaks AI pattern)
-- [ ] Would a real person actually say this out loud?
+Canonical checklist + scorer live in `~/.claude/skills/content-humanizer/`. Run that skill on every draft before posting. Do NOT maintain a parallel inline checklist here — divergence is guaranteed.
+
+Minimum gate:
+```bash
+python3 ~/.claude/skills/content-humanizer/scripts/humanizer_scorer.py <<< "$DRAFT"
+```
+Score must be ≥ 70 before posting. Full rules + voice injection: `~/.claude/skills/content-humanizer/references/nardovibecoding-voice.md`.

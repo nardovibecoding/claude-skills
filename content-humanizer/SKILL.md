@@ -21,18 +21,15 @@ This is not a cleaning service. You're not just removing "delve" and calling it 
 
 ## Before Starting
 
-**Check for context first:**
-If `marketing-context.md` exists, read it. It contains brand voice guidelines, writing examples, and the specific tone this brand uses. That context is your voice blueprint. Use it — don't improvise a voice when the brief already defines one.
+**Voice baseline hierarchy (read in order, first match wins):**
+1. If the target is `@nardovibecoding` / X / Bernard's public persona → load `references/nardovibecoding-voice.md`. That IS the voice baseline. Do not ask for another example.
+2. If `marketing-context.md` exists next to SKILL.md or in the calling project → load it. That's the brand blueprint.
+3. Otherwise ask ONE question: "Before I rewrite this, give me an example of content you've written or read that felt right. Specific is better than descriptive."
 
-Gather what you need before starting:
-
-### What you need
+Gather:
 - **The content** — paste the draft to humanize
-- **Brand voice notes** — if no `marketing-context.md`, ask: "Is your voice direct/casual/technical/irreverent? Give me one example of writing you love."
-- **Audience** — who reads this? (This changes what "human" sounds like)
-- **Goal** — what should this piece do? (Knowing the goal tells you how much personality is appropriate)
-
-One question if needed: "Before I rewrite this, give me an example of content you've written or read that felt right. Specific is better than descriptive."
+- **Audience** — who reads this? (Changes what "human" sounds like)
+- **Goal** — what should this piece do? (Determines how much personality is appropriate)
 
 ## How This Skill Works
 
@@ -52,6 +49,21 @@ Run all three in one pass when you have enough context. Split them when the clie
 ---
 
 ## Mode 1: Detect — AI Pattern Analysis
+
+**Mandatory gate:** run `scripts/humanizer_scorer.py` first on the input — it produces a 0-100 humanity score + breakdown by signal. This is the deterministic baseline before any LLM judgment.
+
+```bash
+python3 ~/.claude/skills/content-humanizer/scripts/humanizer_scorer.py < input.txt
+# or pipe directly: echo "$CONTENT" | python3 ~/.claude/skills/content-humanizer/scripts/humanizer_scorer.py
+```
+
+Score thresholds:
+- **< 40** → heavy AI tone, run all 3 modes
+- **40–65** → medium AI tone, Mode 1 + 2 sufficient
+- **65–80** → mild, Mode 2 polish only
+- **> 80** → already human, skip unless user requests voice injection
+
+After Mode 2 pass, re-run the scorer. Goal: ≥ 70 (or ≥ previous score + 15, whichever is higher). If not met, loop back to Mode 2 with flagged signals.
 
 Scan the content for these categories. Score severity: 🔴 critical (kills credibility) / 🟡 medium (softens impact) / 🟢 minor (polish only).
 

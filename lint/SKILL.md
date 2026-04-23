@@ -2,9 +2,8 @@
 name: lint
 description: |
   Unified system maintenance — wiki integrity, memory health, JSONL mining, skill audit, pattern promotion.
-  Combines former lint + memory-maintenance + skillcleaning into one skill.
-  Triggers: "lint", "memory maintenance", "clean memory", "stale memory", "mine sessions", "promote patterns", "skill cleaning", "audit skills", "unused skills".
-  NOT FOR: editing specific memory files (just edit), installing skills (use extractskill), security scans (use skill-security-auditor).
+  Triggers: "lint", "memory maintenance", "clean memory", "mine sessions", "promote patterns", "audit skills".
+  NOT FOR: editing memory files (just edit), installing skills (extractskill), security scans (skill-security-auditor).
 user-invocable: true
 ---
 <lint>
@@ -193,16 +192,17 @@ Score every actionable memory entry on three dimensions (0-3 each):
 | **Impact** | Nice to know | Saves minor time | Prevents bugs | Prevents outages |
 | **Scope** | Single file | Single project area | Whole project | Cross-project |
 
-**Promotion threshold: total score >= 6**
+**Promotion threshold: total score ≥ 7/9** (matches unattended Phase 5b threshold)
 
 Recurring signals: same concept in 2+ files, user corrected Claude multiple times, imperative language ("always", "never"), survived 3+ maintenance cycles.
 
-Promotion targets:
+Promotion targets (per CLAUDE.md "Rule promotion routing" HARD RULE — default to scoped file, CLAUDE.md only for universal):
 | Pattern type | Target |
 |---|---|
-| Project-wide convention | CLAUDE.md |
-| File-type specific | `.claude/rules/<topic>.md` |
-| Personal preference | `~/.claude/CLAUDE.md` |
+| Project/domain-specific (mentions kalshi/polymarket/manifold/ship/agent/skill/hook/etc.) | `~/.claude/rules/<scope>.md` |
+| File-type specific (python/markdown/yaml patterns) | `~/.claude/rules/<file-type>.md` |
+| Truly universal / cross-cutting discipline (no project keyword) | `~/.claude/CLAUDE.md` |
+| Unclear scope | flag for MANUAL — do NOT default to CLAUDE.md |
 
 Transform from description to prescription, write as imperative, remove from memory source.
 
@@ -266,7 +266,7 @@ Skip Phase 6 for `/lint --quick`.
 | Topic files count | 0-15 | 16-30 | > 30 |
 | Stale entries | 0 | 1-3 | > 3 |
 | Pending JSONL (>7d) | 0 | 1-3 | > 3 |
-| Skills count | < 30 | 30-50 | > 50 |
+| Skills count | < 80 | 80-120 | > 120 |
 | Skills disk | < 100MB | 100-500MB | > 500MB |
 
 ## Flags
