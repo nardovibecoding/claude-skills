@@ -10,6 +10,34 @@ license: Proprietary. LICENSE.txt has complete terms
 
 # PDF Processing Guide
 
+## ⚠️ Current state (2026-04-23): DEPENDENCY GAP
+
+**Before running any script in this skill, run the fail-loud check below.** Audit (2026-04-23) found pypdf / pdfplumber / pdf2image NOT installed, and qpdf / pdftk / magick CLIs absent. Every script crashes at import. PyMuPDF (`import fitz`) version 1.27.2.2 IS installed and covers all core PDF ops.
+
+### Fail-loud dependency check (run FIRST every invocation)
+
+```bash
+python3 -c "import fitz; print(f'fitz {fitz.__version__} — OK')" || { echo "PyMuPDF missing — install: pip3 install pymupdf --break-system-packages"; exit 1; }
+python3 -c "from pypdf import PdfReader" 2>/dev/null || echo "⚠️ pypdf missing — legacy scripts (scripts/*.py) will fail. Use PyMuPDF path below or install: pip3 install pypdf pdfplumber pdf2image --break-system-packages"
+```
+
+### Two usage paths (pick one, do not mix)
+
+**Path A — install missing deps (fastest, uses existing scripts/):**
+```bash
+pip3 install pypdf pdfplumber pdf2image --break-system-packages
+# Now scripts/*.py work as documented below
+```
+
+**Path B — use PyMuPDF (recommended, zero new installs):**
+Read PDFs with `fitz.open(path)` — `.page_count`, `.load_page(i)`, `.get_text()`, `.get_textbox()`, `.get_pixmap()` cover the read/extract/render surface. Form filling via `page.widgets()` → `widget.field_value = x; page.update_widget(widget)`. Images via `page.get_images()`. See https://pymupdf.readthedocs.io/ for full API.
+
+### Large-PDF read rule
+
+**PDFs with >10 pages: ALWAYS pass `pages` param when reading via Claude's Read tool.** Example: `Read(file_path="report.pdf", pages="1-5")`. Without `pages`, Read fails silently on large PDFs. Max 20 pages per call.
+
+---
+
 ## Overview
 
 This guide covers essential PDF processing operations using Python libraries and command-line tools. For advanced features, JavaScript libraries, and detailed examples, see REFERENCE.md. If you need to fill out a PDF form, read FORMS.md and follow its instructions.
