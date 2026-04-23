@@ -2,6 +2,13 @@
 
 Eng-lens only. No CEO/Design/DX bloat.
 
+## OUTPUT CONTRACT (enforced for owning strict-* agents)
+
+- WRITE the full brief to `.ship/<feature>/0N-<phase>.md` via the Write tool.
+- RETURN only: (a) the artifact file path, (b) a ≤15-line summary (verdict + key counts + top 3 risks).
+- NEVER include the full §0-§N body in the return message. The file on disk is the source of truth.
+- Phase is not closed until `test -s .ship/<feature>/0N-<phase>.md` passes.
+
 ## Steps
 
 1. **Plan agent drafts** — spawn `Plan` subagent (Sonnet default) with spec + codebase context. Output: architecture sketch, components, files touched.

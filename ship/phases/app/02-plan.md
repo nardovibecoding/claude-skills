@@ -2,6 +2,13 @@
 
 gstack's autoplan: parallel lens reviews, auto-decide 80%, surface only User-Challenges + Taste-Decisions.
 
+## OUTPUT CONTRACT (enforced for owning strict-* agents)
+
+- WRITE the full brief to `.ship/<feature>/0N-<phase>.md` via the Write tool.
+- RETURN only: (a) the artifact file path, (b) a ≤15-line summary (verdict + key counts + top 3 risks).
+- NEVER include the full §0-§N body in the return message. The file on disk is the source of truth.
+- Phase is not closed until `test -s .ship/<feature>/0N-<phase>.md` passes.
+
 ## MVP 3-stage mindset (slavingia)
 
 Before drafting architecture, ask: can we stay in stage 1 longer?

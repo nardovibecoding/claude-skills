@@ -15,10 +15,11 @@ Shows the 5 most recent memos from local disk (Mac), covering both:
 
 ## Steps
 
-1. **Pull latest**:
+1. **Pull latest** (auto-rebase + autostash configured locally):
    ```bash
-   cd ~/telegram-claude-bot && git pull --ff-only --quiet 2>/dev/null
+   cd ~/telegram-claude-bot && git pull origin main 2>&1 | tail -3
    ```
+   If pull fails, surface the error — do NOT silence with `2>/dev/null`.
 
 2. **List 5 newest memos across both dirs**:
    ```bash

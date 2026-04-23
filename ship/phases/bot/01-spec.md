@@ -14,6 +14,13 @@ Apply these when making judgment calls during any phase. Surface only User-Chall
 6. **Bias to action** — when 2 options are close, pick the reversible one and move
 7. **WALLET SAFETY** — touching keys/trades/wallet code → err toward safety, extra verification, dry-run first
 
+## OUTPUT CONTRACT (enforced for owning strict-* agents)
+
+- WRITE the full brief to `.ship/<feature>/0N-<phase>.md` via the Write tool.
+- RETURN only: (a) the artifact file path, (b) a ≤15-line summary (verdict + key counts + top 3 risks).
+- NEVER include the full §0-§N body in the return message. The file on disk is the source of truth.
+- Phase is not closed until `test -s .ship/<feature>/0N-<phase>.md` passes.
+
 ## Steps
 
 1. **Idea refine** — restate objective in one sentence. Is it concrete + measurable? If vague ("improve the bot"), push back and ask what specifically + how success is measured.
