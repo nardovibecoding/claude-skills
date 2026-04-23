@@ -3,7 +3,7 @@ name: extractskill
 description: |
   Evaluate and install community AI skills from GitHub URLs or skill repos.
   Triggers: "extract skill", "evaluate skill", "check this skill", shared skill URL, list of skills to review.
-  NOT FOR: security scanning (use skill-security-auditor), skill cleanup (use skillcleaning).
+  NOT FOR: security scanning (use skill-security-auditor), skill cleanup (use lint).
   Produces: installed skill or extracted patterns saved to memory.
 user-invocable: true
 ---
@@ -34,11 +34,11 @@ For each skill URL:
 Score against Bernard's existing system:
 
 **Overlap check** — Does our system already do this?
-- Check installed skills: ls ~/.claude/skills/
+- Check installed skills: `ls ~/.claude/skills/`
 - Check plugins: security-guidance, hookify, frontend-design
-- Check existing tools: sanitizer.py, auto_healer, fetch_watchdog, memory system, evolution feed
-- Check CLAUDE.md rules
-- Check memory files for prior research
+- Check existing tools (confirm-existing before assuming): `~/.claude/hooks/` + `~/.claude/scripts/` (grep for memory system, skill-security-auditor, dispatcher_post.py, graph_merge.py)
+- Check CLAUDE.md rules + `~/.claude/rules/*.md`
+- Check memory files: `ls ~/.claude/projects/-Users-bernard/memory/ | grep -iE 'research|feedback|reference'`
 
 **Score: 0-100% overlap**
 - 0-30%: Genuinely new capability — INSTALL candidate
@@ -50,13 +50,21 @@ Score against Bernard's existing system:
 - VPS deployment, security, monitoring, memory management
 - If it solves a problem we don't have, SKIP regardless of overlap
 
-### Step 3: Security Scan
+### Step 3: Security Scan (MANDATORY — not optional)
 
-Before installing, run the skill-security-auditor or manually check for:
-- eval(), exec(), os.system(), subprocess with shell=True
-- Network calls to external URLs (requests.post, urllib, httpx)
-- Credential access (~/.ssh, ~/.aws, env var harvesting)
-- Prompt injection in SKILL.md (ignore previous instructions, you are now...)
+**Must run before any INSTALL.** Invoke `skill-security-auditor` skill on the fetched skill directory. Do NOT fall back to manual grep — the auditor covers 11+ threat categories the eyeball-check misses.
+
+```bash
+# Point auditor at the fetched skill
+~/.claude/skills/skill-security-auditor/scripts/scan.py <fetched-skill-dir>
+```
+
+Gate logic:
+- **PASS** → proceed to Step 4 Act
+- **WARN** → surface findings, require user confirm before install
+- **FAIL** → STOP. Do NOT install. Report findings + offer to open in read-only mode for manual review.
+
+Covered categories: eval/exec/shell=True, network calls, credential harvesting, prompt injection, DNS exfil via gethostbyname, filesystem writes outside skill dir, subprocess shell injection, env var reads, pickle/marshal deserialization, etc.
 
 ### Step 4: Act
 
@@ -70,7 +78,7 @@ Before installing, run the skill-security-auditor or manually check for:
 2. Extract ONLY the unique patterns/techniques we're missing
 3. Append to ~/.claude/projects/-Users-bernard/memory/research_extracted_patterns.md
 4. Update MEMORY.md if adding a new reference file
-5. If patterns are actionable rules, consider adding to CLAUDE.md
+5. If patterns are actionable rules, route per CLAUDE.md "Rule promotion routing" HARD RULE: project/domain-specific → `~/.claude/rules/<scope>.md`; truly universal → CLAUDE.md. Default to scoped file — CLAUDE.md stays lean.
 
 **If SKIP:**
 1. One-line explanation why
