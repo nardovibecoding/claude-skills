@@ -19,6 +19,20 @@ slavingia principle: **Sell before build.** Validate idea manually before writin
 - NEVER include the full §0-§N body in the return message. The file on disk is the source of truth.
 - Phase is not closed until `test -s .ship/<feature>/0N-<phase>.md` passes.
 
+## Acceptance Criteria format (EARS — mandatory)
+
+Every AC in this spec MUST match one of these five EARS patterns. Prose ACs are REJECTED by strict-plan auditor — failing EARS parse = phase does not close.
+
+| Pattern | Template |
+|---|---|
+| Event-driven | `WHEN <event> THE <system> SHALL <behavior>` |
+| Conditional | `IF <precondition> THEN THE <system> SHALL <behavior>` |
+| Continuous | `WHILE <state> THE <system> SHALL <behavior>` |
+| Contextual | `WHERE <location/context> THE <system> SHALL <behavior>` |
+| Ubiquitous | `THE <system> SHALL <behavior>` |
+
+Each AC must also carry a REQ-ID (e.g. `REQ-01`) for adversarial audit citation.
+
 ## Steps
 
 1. **Idea refine + validate-idea** —
@@ -40,9 +54,23 @@ slavingia principle: **Sell before build.** Validate idea manually before writin
 9. **Success metrics** — user-visible KPIs (sign-ups, retention, revenue — not code metrics)
 10. **Deps + risks** — upstream deps + user safety risks (auth, payments, PII)
 
+## §6.5 Adversarial SPEC Audit (required before gate)
+
+After all steps above, spawn a second `strict-plan` invocation with default stance: **"this SPEC has defects — find them."**
+
+The adversarial auditor MUST:
+- Cite specific REQ-IDs for each defect found
+- Flag: EARS violation, missing counterpart action, unmeasurable AC, undefined terms, contradictions
+- Return PASS only if zero CRITICAL defects found
+- Any CRITICAL defect = Phase 1 CANNOT close
+
+Write audit output to `.ship/<slug>/goals/01-spec-audit.md`.
+
+If complexity tier = `small`, the adversarial audit is skipped (compressed Phase 1 per complexity router).
+
 ## Artifact
 
-`.ship/<feature>/01-spec.md`
+`.ship/<slug>/goals/01-spec.md` (legacy: `.ship/<feature>/01-spec.md` also written for backwards compat)
 
 ## Gate
 

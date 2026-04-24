@@ -22,6 +22,14 @@ Full ritual — users depend on quality.
    - Dependencies: vuln scan (`npm audit` / `pip-audit` / `gh audit`)
    - PII handling: encrypted at rest + in transit
    - Rate limiting: prevent abuse
+
+   **CRITICAL finding = hard fail (no exceptions):**
+   If the security scan returns ANY finding with `severity=CRITICAL`, Phase 4 MUST fail-closed. No `--force` override. Smoke test and perf results are irrelevant — CRITICAL blocks regardless.
+
+   The ONLY way to close Phase 4 with an open CRITICAL is a documented exception:
+   - Write `.ship/<slug>/state/04-land-exception.md`
+   - Include: CRITICAL finding description, why it cannot be fixed now, Bernard-approved justification (explicit ack required — auto-mode cannot approve)
+   - Exception file must exist AND have Bernard's ack string before Phase 4 can close
 6. **Performance check (web-app)** — Measure → Identify → Fix → Verify → Guard:
    - **Core Web Vitals:**
      - LCP ≤ 2.5s (largest contentful paint)

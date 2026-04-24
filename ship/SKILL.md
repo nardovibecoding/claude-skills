@@ -29,10 +29,33 @@ documents:
 
 On invoke, identify:
 
-1. **Mode** — new (default) / audit / continue / big-systemd
+1. **Mode** — new (default) / audit / continue / big-systemd / refresh
 2. **Variant** — bot (internal) or app (public) based on target keywords. Ambiguous → ask.
 3. **Feature slug** — sanitize user's name for `.ship/<slug>/` artifact dir
 4. **Big-SystemD auto-load** — if user invokes `/ship <big-systemd-phase>` (e.g. `/ship phase4`, `/ship 4.4`, `/ship inbox`), auto-load the matching `~/NardoWorld/meta/phaseN_scope.md` (4, 5, 6, 7 exist) + `~/NardoWorld/meta/big_systemd_master_plan.md` as additional context before Phase 1.
+5. **`--deepthink` auto-trigger** — if feature slug contains `strategy`, `architecture`, `refactor`, or `migration`, OR user passes `--deep` flag → invoke strict-plan/strict-execute with `extended_thinking: true` for all phases.
+6. **Complexity tier auto-detect** — before Phase 1, spawn quick `strict-explore` scan (≤30s) over feature's likely file scope. Classify tier:
+   - **trivial** (1 file, <50 LOC touched) → skip Phase 1+2, run Phase 3 with inline brief → Phase 4 verify → Phase 5
+   - **small** (≤5 files, <200 LOC) → compressed Phase 1 (EARS ACs only, skip adversarial audit), full Phase 2-5
+   - **large** (default) → full 5-phase pipeline
+   Override with `--tier=large` flag. `--deepthink` always forces `large`.
+
+## Phase 0 — Recall (skip with `--cold` flag)
+
+Before Phase 1 fires, grep prior art for the feature slug tokens:
+
+```bash
+# 1. Prior .ship monitor lessons
+grep -rl "<slug-tokens>" ~/.ship/*/reports/ 2>/dev/null | head -5
+
+# 2. Claude project memory lessons
+grep -rl "<slug-tokens>" ~/.claude/projects/-Users-bernard/memory/lesson_*.md 2>/dev/null | head -5
+
+# 3. NardoWorld lessons
+grep -rl "<slug-tokens>" ~/NardoWorld/lessons/*.md 2>/dev/null | head -5
+```
+
+Take top-5 matches across all three sources. Inject as **PRIOR ART** section at top of Phase 1 brief. Rule-based grep only — no LLM. If zero matches, note "no prior art found" and continue.
 
 ## Phase flow (lazy-load)
 
@@ -41,7 +64,12 @@ For each phase N:
 2. **Identify owning strict-* agent** per Phase Agent Map below
 3. Execute phase per loaded instructions — use owning agent's brief template
 4. **SPREAD/SHRINK pass** before closing phase (L1-L5 + Sh1-Sh5 checklist)
-5. Write `.ship/<slug>/0N-<phase>.md` artifact with full brief
+5. Write artifact to subdir layout:
+   - Phase 1 → `.ship/<slug>/goals/01-spec.md` (+ `goals/01-spec-audit.md` for adversarial audit)
+   - Phase 2 → `.ship/<slug>/goals/02-plan.md`
+   - Phase 3 → `.ship/<slug>/experiments/03-execution-log.md`
+   - Phase 4 → `.ship/<slug>/state/04-land.md`
+   - Phase 5 → `.ship/<slug>/reports/05-monitor.md`
 6. Approval gate (skip if `--auto` mode AND no safety override triggered; Phase 5 is ALWAYS human-gated)
 7. Proceed to next phase
 
@@ -115,7 +143,28 @@ Full 5 phases. Existing code = context loaded Phase 1.
 - Artifact: `.ship/<project>/audit.md`
 
 ### `ship continue <feature>` — resume
-Reads `.ship/<feature>/*.md`, detects last completed phase, resumes next.
+Reads `.ship/<feature>/**/*.md` (subdir layout) + `.ship/<feature>/*.md` (legacy), detects last completed phase, resumes next.
+
+### `ship --mode=refresh` — staleness sweep
+Sweeps all `.ship/*/reports/05-monitor.md` (+ legacy `.ship/*/05-monitor.md`) lessons vs current codebase reality.
+
+For each lesson entry:
+1. Verify `fix_commit` still exists: `git log --oneline | grep <sha>`
+2. Verify affected files still exist: `ls <path>`
+3. Verify root_cause condition still possible (grep codebase for the pattern)
+
+Classify each into:
+- **KEEP** — all 3 checks pass, lesson still valid
+- **UPDATE** — lesson partially stale; apply supersede-not-delete: strikethrough old + append new
+- **CONSOLIDATE** — duplicate of another lesson; merge, keep newer
+- **REPLACE** — lesson fully superseded; replace body with new content
+- **DELETE** — lesson is wrong or inapplicable; human-gated, never auto
+
+Writes sweep report to `.ship/_refresh_<YYYY-MM-DD>.md`.
+
+`--mode=refresh --apply` executes UPDATE/CONSOLIDATE/REPLACE automatically. DELETE always requires human confirmation regardless of `--apply`.
+
+Phase file: `phases/common/refresh.md`.
 
 ### `ship <big-systemd-phase>` — Big SystemD queue dispatch
 Triggers: `/ship phase4`, `/ship 4.4`, `/ship inbox`, `/ship daemons`, `/ship state-registry`, etc.
@@ -128,12 +177,21 @@ Triggers: `/ship phase4`, `/ship 4.4`, `/ship inbox`, `/ship daemons`, `/ship st
 
 ```
 .ship/<feature-slug>/
-├── 01-spec.md         # strict-research/strict-plan brief
-├── 02-plan.md         # strict-plan brief
-├── 03-execution-log.md # strict-execute brief (one per slice)
-├── 04-land.md         # strict-execute + strict-plan briefs
-└── 05-monitor.md      # strict-review brief (T+24h, T+7d entries)
+├── goals/
+│   ├── 01-spec.md         # strict-research/strict-plan brief
+│   ├── 01-spec-audit.md   # adversarial SPEC audit output
+│   └── 02-plan.md         # strict-plan brief
+├── experiments/
+│   └── 03-execution-log.md # strict-execute brief (one per slice; append per iteration)
+├── state/
+│   └── 04-land.md         # strict-execute + strict-plan briefs + live verify outputs
+└── reports/
+    └── 05-monitor.md      # strict-review brief (T+24h, T+7d entries; YAML two-track)
 ```
+
+**Backwards compat:** if `.ship/<slug>/0N-<phase>.md` exists (legacy flat layout), /ship reads both but writes new artifacts to the subdir layout above. Never delete legacy files during migration.
+
+**Refresh sweep output:** `.ship/_refresh_<YYYY-MM-DD>.md`
 
 ## When NOT to use /ship
 

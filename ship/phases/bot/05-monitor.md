@@ -50,11 +50,34 @@ git push --force-with-lease  # CAREFUL — confirm first
 
 - If clean: declare DONE
 - Update `~/NardoWorld/CHANGELOG.md` with outcome
-- Append lesson to memory (tie to /combo skill if worth formalizing)
+- Write structured lesson entry (see YAML two-track format below)
+
+## Lesson capture — YAML two-track (required)
+
+Every Phase 5 artifact MUST include at least one lesson entry using this structured format. Replaces freeform "lessons learned" prose.
+
+```yaml
+---
+track: bug | knowledge        # bug = postmortem; knowledge = architectural decision
+problem_type: <enum>          # bug-track only: timing-race | config-drift | supersede-missing | type-error | data-loss | perf-regress | security | other
+decision_type: <enum>         # knowledge-track only: pattern | convention | tradeoff | non-goal | other
+symptoms:                     # bug-track only (list)
+  - <symptom 1>
+  - <symptom 2>
+root_cause: <one-line>        # bug-track only
+fix_commit: <sha>             # bug-track only
+architecture_pattern: <slug>  # knowledge-track only
+convention: <slug>            # knowledge-track only
+feature_slug: <slug>
+created: <YYYY-MM-DD>
+---
+```
+
+Body: 2-5 paragraphs describing the lesson. Indexed by Phase 0 recall grep (PLUG 1). Each monitor artifact may contain multiple `---`-delimited lesson blocks.
 
 ## Artifact
 
-`.ship/<feature>/05-monitor.md` (baseline snapshot, tick log, final verdict)
+`.ship/<slug>/reports/05-monitor.md` (baseline snapshot, tick log, final verdict, YAML lesson blocks)
 
 ---
 

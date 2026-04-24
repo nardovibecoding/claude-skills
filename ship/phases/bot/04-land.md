@@ -21,6 +21,14 @@ Post-production bookend — discipline gate before declaring done.
    - Wallet exposure: POLY_PRIVATE_KEY path unchanged / safe?
    - Cookies/tokens: not logged? not committed?
    - Dependencies: new deps — CVE scan if relevant
+
+   **CRITICAL finding = hard fail (no exceptions):**
+   If the security scan returns ANY finding with `severity=CRITICAL`, Phase 4 MUST fail-closed. No `--force` override. Smoke test results and perf results are irrelevant — CRITICAL blocks regardless.
+
+   The ONLY way to close Phase 4 with an open CRITICAL is a documented exception:
+   - Write `.ship/<slug>/state/04-land-exception.md`
+   - Include: CRITICAL finding description, why it cannot be fixed now, Bernard-approved justification (explicit ack required — auto-mode cannot approve)
+   - Exception file must exist AND have Bernard's ack string before Phase 4 can close
 5. **Dry-run/paper flip** (trading code) — 15-min paper mode run before live flip. Balance unchanged = proceed.
 6. **Performance check (bot-specific)** — Measure → Identify → Fix → Verify → Guard:
    - **Scan loop rate** vs baseline (scans/min)

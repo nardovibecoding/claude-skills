@@ -43,6 +43,28 @@ When bug/failure encountered mid-slice, run this sequence (not just "retry with 
 
 Dev loops hammering APIs = wasted quota. Use cached responses / mocks / paper mode for rapid iteration.
 
+## [DANGER] annotation rule (mandatory for bot variant)
+
+Any code path that touches wallet private keys, trade execution, or irreversible external calls (on-chain tx, API key rotation, destructive API endpoints) MUST have an inline `# [DANGER]` comment directly above the call site.
+
+The comment must include all three fields:
+
+```python
+# [DANGER]
+# caller-count: N          (grep result — how many callers reach this path)
+# goroutine-risk: yes/no/n-a
+# rollback-path: <explicit steps> OR 'not-possible'
+result = execute_trade(order)
+```
+
+**Mandatory on commit.** strict-execute refuses to land Phase 4 if any new wallet/trade/irreversible-call path lacks this annotation. Run before closing Phase 3:
+
+```bash
+# verify all new dangerous paths are annotated
+git diff HEAD~1 | grep -E "(private_key|execute_trade|sign_tx|rotate_key|destructive)" | grep -v "# \[DANGER\]"
+# output must be empty
+```
+
 ## Bot-specific
 
 - **Live tail during edits** — if editing trading code: `tail -f` the bot log in parallel pane
