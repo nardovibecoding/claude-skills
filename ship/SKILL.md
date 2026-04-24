@@ -45,8 +45,8 @@ On invoke, identify:
 Before Phase 1 fires, grep prior art for the feature slug tokens:
 
 ```bash
-# 1. Prior .ship monitor lessons
-grep -rl "<slug-tokens>" ~/.ship/*/reports/ 2>/dev/null | head -5
+# 1. Prior .ship monitor lessons (both global ~/.ship and per-project $cwd/.ship)
+grep -rl "<slug-tokens>" ~/.ship/*/reports/ "$PWD/.ship"/*/reports/ 2>/dev/null | head -5
 
 # 2. Claude project memory lessons
 grep -rl "<slug-tokens>" ~/.claude/projects/-Users-bernard/memory/lesson_*.md 2>/dev/null | head -5
