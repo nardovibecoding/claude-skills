@@ -19,6 +19,10 @@ Prompt to agent:
 DATE = today (YYYY-MM-DD format, use `date +%Y-%m-%d`).
 JSONL_DIR = /Users/bernard/.claude/projects/-Users-bernard/
 MEM_DIR = /Users/bernard/.claude/projects/-Users-bernard/memory/
+CKPT = /Users/bernard/.claude/projects/-Users-bernard/memory/.save_checkpoints.jsonl
+
+### A0) Load checkpoints
+Read CKPT (touch first if missing — empty file = no prior saves). Build a dict `session_id -> last_msg_uuid` from the latest entry per session. This is your skip oracle: any session whose current jsonl tail uuid matches its checkpoint is fully saved — skip it.
 
 ### A) Inventory
 1. List all `$JSONL_DIR/*.jsonl` modified on DATE (use `ls -lat` + date-field filter, or `find $JSONL_DIR -name '*.jsonl' -newermt DATE -not -newermt DATE+1day`).
@@ -27,6 +31,7 @@ MEM_DIR = /Users/bernard/.claude/projects/-Users-bernard/memory/
 
 ### B) Classify each jsonl
 For each jsonl >=10KB:
+- Read the file's last user/assistant uuid (scan with python3, look for `type` in (user, assistant) and capture `uuid`). Compare against CKPT dict for that session_id (basename without .jsonl). If match → fully saved, SKIP.
 - Use `head -c 8000` and `tail -c 8000` via Bash to sample start + end (jsonl lines can be huge, don't Read full).
 - Extract first user message + last user/assistant content. Infer topic slug (1-4 words, kebab-case).
 - Match against existing saved slugs — skip if topic already saved (fuzzy match: substring or 80% word overlap).
@@ -55,6 +60,8 @@ status: crashed-recovered
 ```
 
 Keep each file <80 lines. Skip jsonls that are pure tool-noise with no substantive convo.
+
+After writing each convo file, append a checkpoint entry to CKPT via `bash ~/.claude/scripts/atomic_append.sh`. Schema: `{"session_id":"<basename>","last_msg_uuid":"<tail user/assistant uuid>","saved_at":"<UTC ISO>","kind":"crash","convo_file":"<path>"}`. Future /s and /crash invocations will then skip this session.
 
 ### D) Report
 Report back in <300 words:

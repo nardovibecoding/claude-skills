@@ -10,8 +10,9 @@
  *
  * Pipeline:
  *   0. Query expansion:
- *      - HyDE: short/vague queries (<6 tokens) → MiniMax generates hypothetical
- *        answer, embedded in place of raw query for vector layer
+ *      - HyDE: short/vague queries (<6 tokens) → 5-provider fallback chain generates
+ *        hypothetical answer (MiniMax→Kimi→Cerebras→Gemini→Groq), embedded in place
+ *        of raw query for vector layer; skip HyDE if all 5 fail (fail-open)
  *      - PRF: top-3 BM25 hits' unique terms appended to query for second BM25 pass
  *   1. Split each file body by `##` headings → chunks (max 8/file, 500 chars each)
  *   2. Vector: per-chunk embeddings via all-MiniLM-L6-v2 (file score = max chunk)
@@ -341,7 +342,15 @@ function reciprocalRankFusionWeighted(rankedLists, weights, k = 60) {
 }
 
 // ---------------------------------------------------------------------------
-// HyDE — generate hypothetical answer via MiniMax for fuzzy queries
+// HyDE — generate hypothetical answer via 5-provider fallback chain
+//
+// Chain (mirrors llm_client.py _FALLBACK_CHAIN order):
+//   1. MiniMax M2.7        3500ms
+//   2. Kimi-for-Coding     2000ms
+//   3. Cerebras Qwen3-235b 1000ms  (fastest inference)
+//   4. Gemini 2.5 Flash    2000ms
+//   5. Qwen3-32b via Groq  2000ms
+//   If all 5 fail: return null (fail-open, search continues without HyDE signal)
 // ---------------------------------------------------------------------------
 
 function readEnvKey(key) {
@@ -353,33 +362,130 @@ function readEnvKey(key) {
   return null;
 }
 
-async function hydeExpand(rawQuery) {
-  const apiKey = readEnvKey("MINIMAX_API_KEY");
-  if (!apiKey) return null;
-  const prompt = `Write a 2-3 sentence technical note that could be a memo/wiki answer to: "${rawQuery}". Use concrete terms, file paths, function names, or concepts you'd expect. No hedging.`;
+// Provider definitions for HyDE fallback chain.
+// Each entry: { name, keyEnv, baseUrl, model, timeoutMs, extraHeaders? }
+const HYDE_PROVIDERS = [
+  {
+    name: "MiniMax",
+    keyEnv: "MINIMAX_API_KEY",
+    baseUrl: "https://api.minimax.chat/v1/chat/completions",
+    model: "MiniMax-M2.7",
+    timeoutMs: 3500,
+  },
+  {
+    name: "Kimi",
+    keyEnv: "KIMI_API_KEY",
+    baseUrl: "https://api.kimi.com/coding/v1/chat/completions",
+    model: "kimi-for-coding",
+    timeoutMs: 2000,
+    extraHeaders: { "User-Agent": "claude-code/1.0" },
+  },
+  {
+    name: "Cerebras",
+    keyEnv: "CEREBRAS_API_KEY",
+    baseUrl: "https://api.cerebras.ai/v1/chat/completions",
+    model: "qwen-3-235b-a22b-instruct-2507",
+    timeoutMs: 1000,
+  },
+  {
+    name: "Gemini",
+    keyEnv: "GEMINI_API_KEY",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    model: "gemini-2.5-flash",
+    timeoutMs: 2000,
+  },
+  {
+    name: "Groq-Qwen3",
+    keyEnv: "GROQ_API_KEY",
+    baseUrl: "https://api.groq.com/openai/v1/chat/completions",
+    model: "qwen/qwen3-32b",
+    timeoutMs: 2000,
+  },
+];
+
+// Errors that should skip to next provider immediately (not worth retrying).
+const HYDE_FATAL_SUBSTRINGS = [
+  "429", "rate limit", "tokens per minute", "tpm",
+  "529", "overloaded", "service unavailable", "503",
+  "413", "payload too large", "request too large",
+  "insufficient_balance", "invalid_api_key", "authentication",
+];
+
+function hydeFatal(errText) {
+  const lower = errText.toLowerCase();
+  return HYDE_FATAL_SUBSTRINGS.some(s => lower.includes(s));
+}
+
+/**
+ * Call a single provider with timeout. Returns response text or throws.
+ * Uses fetch (Node 18+ built-in) with AbortController for timeout.
+ */
+async function hydeCallProvider(provider, prompt) {
+  const apiKey = readEnvKey(provider.keyEnv);
+  if (!apiKey) throw new Error(`no key for ${provider.name}`);
+
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), HYDE_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), provider.timeoutMs);
+
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${apiKey}`,
+    ...(provider.extraHeaders || {}),
+  };
+
+  let res;
   try {
-    const res = await fetch("https://api.minimax.chat/v1/chat/completions", {
+    res = await fetch(provider.baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      headers,
       body: JSON.stringify({
-        model: "MiniMax-M2.7",
+        model: provider.model,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 120,
         temperature: 0.3,
       }),
       signal: controller.signal,
     });
-    clearTimeout(t);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data?.choices?.[0]?.message?.content?.trim();
-    return text || null;
-  } catch {
-    clearTimeout(t);
-    return null;
+  } finally {
+    clearTimeout(timer);
   }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  // Standard OpenAI-compatible response; Kimi reasoning models may put answer in reasoning_content
+  const msg = data?.choices?.[0]?.message;
+  const text = (msg?.content || msg?.reasoning_content || "").trim();
+  if (!text) throw new Error("empty response");
+  return text;
+}
+
+/**
+ * HyDE expansion with 5-provider fallback chain.
+ * Returns hypothetical-doc text, or null if all providers fail (fail-open).
+ */
+async function hydeExpandWithFallback(rawQuery) {
+  const prompt = `Write a 2-3 sentence technical note that could be a memo/wiki answer to: "${rawQuery}". Use concrete terms, file paths, function names, or concepts you'd expect. No hedging.`;
+
+  for (const provider of HYDE_PROVIDERS) {
+    process.stderr.write(`[hyde] trying ${provider.name} (${provider.timeoutMs}ms)...\n`);
+    try {
+      const text = await hydeCallProvider(provider, prompt);
+      process.stderr.write(`[hyde] ${provider.name} succeeded (${text.length} chars)\n`);
+      return text;
+    } catch (err) {
+      const errStr = String(err.message || err);
+      const isFatal = hydeFatal(errStr) || errStr.includes("abort");
+      process.stderr.write(`[hyde] ${provider.name} failed${isFatal ? " (fatal→skip)" : ""}: ${errStr.slice(0, 120)}\n`);
+      // Continue to next provider regardless (fatal just skips retry on same provider, which we don't do anyway)
+    }
+  }
+
+  process.stderr.write("[hyde] all 5 providers failed — skipping HyDE, continuing without hypothetical-doc signal\n");
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -478,10 +584,10 @@ async function main() {
   const queryTokens = tokenize(query);
   let hydeText = null;
   if (!noHyde && queryTokens.length > 0 && queryTokens.length <= HYDE_MAX_TOKENS) {
-    process.stderr.write(`[hyde] short query (${queryTokens.length} tokens) — calling MiniMax...\n`);
-    hydeText = await hydeExpand(query);
-    if (hydeText) process.stderr.write(`[hyde] got ${hydeText.length} chars\n`);
-    else process.stderr.write(`[hyde] failed or unavailable — using raw query\n`);
+    process.stderr.write(`[hyde] short query (${queryTokens.length} tokens) — starting fallback chain...\n`);
+    hydeText = await hydeExpandWithFallback(query);
+    if (hydeText) process.stderr.write(`[hyde] expansion complete (${hydeText.length} chars)\n`);
+    else process.stderr.write(`[hyde] all providers failed — using raw query for vector layer\n`);
   }
 
   // Chunked embeddings

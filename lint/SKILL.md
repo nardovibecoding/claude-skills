@@ -257,6 +257,34 @@ After report, offer to: delete replaced skills, disable unused (.disabled), upda
 
 Skip Phase 6 for `/lint --quick`.
 
+## Phase 7: Code-redundancy scan (source files)
+
+Scans source code for Phase-N prototype markers, superseded/replaced/deprecated comments, and other dead-code signals. Complements Phase 1's wiki/memory scan + Phase 6's skill audit by covering the source-file gap.
+
+```bash
+python3 ~/llm-wiki-stack/lint/scripts/code_redundancy_scan.py --severity HIGH
+```
+
+Default scopes: `~/prediction-markets/packages/`, `~/.claude/hooks/`, `~/.claude/scripts/`.
+
+Flags:
+- `--scope <dir>` — override scope (repeatable)
+- `--severity LOW|MEDIUM|HIGH` — minimum severity to report
+- `--json` — machine-readable output
+
+Markers detected:
+- HIGH: `Phase N prototype/experimental/alpha`, `superseded by`, `replaced by`
+- MEDIUM: `deprecated`, `legacy`, `// killed` / `# killed`, `// removed` / `# removed`, `// dead code`
+- LOW: `TODO: delete/remove/kill`, `out of scope for this module`
+
+Output: file:line + match + severity + reason. Human reviews HIGH first; if module is config-off + superseded + still wired, delete (per CLAUDE.md "replaced = deleted" rule).
+
+NOT auto-fix — code deletion is too risky for unattended cron. For each HIGH finding, show user, ask delete/keep/defer.
+
+Skip Phase 7 for `/lint --quick`.
+
+Source: pm-london wedge 2026-04-25 — adversarial-detector.ts was a Phase 1 prototype superseded by Python pipeline, config-off, but ingestion still wired. Caused production wedge. This scanner catches that pattern.
+
 ## Capacity monitoring (report on every run)
 
 | Metric | Healthy | Warning | Critical |
@@ -270,8 +298,9 @@ Skip Phase 6 for `/lint --quick`.
 | Skills disk | < 100MB | 100-500MB | > 500MB |
 
 ## Flags
-- `/lint` -- full run (Phase 1 + 1.5 + 2 + 3 + 4 + 5 + 6 + capacity)
+- `/lint` -- full run (Phase 1 + 1.5 + 2 + 3 + 4 + 5 + 6 + 7 + capacity)
 - `/lint --quick` -- Phase 1 + 4 only (deterministic, fast, no LLM, no merge, no mining)
+- `/lint --code` -- Phase 7 only (source-file redundancy scan)
 - `/lint --fix` -- Phase 1 with auto-fix + index rebuild + graph sync (includes merge)
 - `/lint --memory` -- Phase 3 + 4 + 5 only (memory-focused maintenance)
 - `/lint --skills` -- Phase 6 only (skill audit + cleanup)
