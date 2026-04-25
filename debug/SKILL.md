@@ -1,0 +1,110 @@
+---
+name: debug
+description: |
+  Unified debug skill — Wiring / Bug / Drift / Zombie / Performance / Flaky / Orphan modes.
+  Reads Phase 4 graphs (state_registry / pipeline_graph / data_lineage / sync_graph / consistency_registry) read-only.
+  Writes verdicts to ~/NardoWorld/realize-debt.md (the realization-debt ledger; lockfile-protected atomic writes).
+  S1+S3 scope: Wiring + Bug modes shipped. Drift / Zombie / Performance / Flaky stubbed for S8.
+
+  Triggers (verb-first):
+    /debug check <feature>    — Wiring mode (B: feature-first → runtime). "is X live", "did we wire X", "is X actually running"
+    /debug bug "<symptom>"    — Bug mode (A: symptom-first → root cause). 17-step engine. "X is wrong / broken / crashing"
+    /debug list                — show realize-debt.md ledger
+    /debug drift <feature>     — Drift mode (S8, not yet implemented)
+
+  NOT FOR: random fixes (Iron Law forbids), claims without verification (second Iron Law forbids), replacing /ship audit (imports it).
+verified_at: 2026-04-26
+documents:
+  - /Users/bernard/.claude/skills/debug/phases/wiring.md
+  - /Users/bernard/.claude/skills/debug/phases/bug.md
+  - /Users/bernard/.claude/skills/debug/bin/debug.py
+  - /Users/bernard/.claude/skills/debug/bin/_disc.py
+  - /Users/bernard/NardoWorld/meta/state_registry.json
+  - /Users/bernard/NardoWorld/meta/pipeline_graph.json
+  - /Users/bernard/NardoWorld/meta/data_lineage.json
+  - /Users/bernard/NardoWorld/meta/sync_graph.json
+  - /Users/bernard/NardoWorld/meta/consistency_registry.json
+  - /Users/bernard/NardoWorld/realize-debt.md
+  - /Users/bernard/.ship/master-debug/goals/00-master-plan.md
+---
+
+# /debug — unified debug + wiring skill
+
+One mental engine, three entry directions. Subsumes wiring-check, bug-hunting, orphan detection, drift, zombie, performance, flaky modes.
+
+## Iron Laws (shared preamble — see `~/.claude/skills/_iron_laws.md`)
+
+```
+NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+Source: obra/superpowers (MIT). Both laws apply to all /debug modes; full enforcement spec in shared preamble.
+
+## Trigger routing (per master plan §8)
+
+| User phrase | Mode | Phase file |
+|---|---|---|
+| "is X live" / "is X wired" / "is X actually running" / "did we wire X" | Wiring (Group B) | `phases/wiring.md` |
+| `/debug check <feature>` | Wiring (Group B) | `phases/wiring.md` |
+| "X is wrong" / "X is broken" / "X is crashing" / "why isn't X" | Bug (Group A) | `phases/bug.md` |
+| `/debug bug "<symptom>"` | Bug (Group A) | `phases/bug.md` |
+| `/debug list` | (read-only ledger view) | inline below |
+| "X is slow / hot / leaking" | Performance (Group A) | `phases/performance.md` (S8) |
+| "X used to work, now stale" | Drift (Group A) | `phases/drift.md` (S8) |
+| "X is flaky / sometimes fails" | Flaky (Group A) | `phases/flaky.md` (S8) |
+| (daemon-driven, no phrase) | Orphan / Zombie (Group C) | consistency-daemon detector (S5) |
+
+Shipped modes: Wiring (S1) + Bug (S3) + ledger view. Drift / Flaky / Performance return `MODE_NOT_YET_SHIPPED — track in master-debug ship S8`.
+
+## Verbs
+
+### `/debug check <target>`
+Wiring mode. `<target>` syntax:
+- `<host>:<feature>` — e.g. `london:prewarm`, `hel:kalshi-stream`, `mac:dashboard`
+- `<feature>` alone — checks all hosts
+
+Loads `phases/wiring.md`. Returns one of `{wired, partial, not_wired, inconclusive}` + Phase 4 evidence citations + writes a ledger entry.
+
+### `/debug bug "<symptom>"`
+Bug mode. Walks the 17-step engine (TRIAGE → REPRODUCE → BUILD-MAP → EXECUTION-MAP → DEPENDENCY-MAP → PATTERN ANALYSIS → HYPOTHESIS GEN → EXPECTED-SIGNAL → INSTRUMENT → RUNTIME-VERIFY → CLASSIFY → DEPTH-CHECK → ≥3-FAIL ESCALATION → FIX → CLEANUP → VERDICT-VERIFY → LEDGER). Loads `phases/bug.md`.
+
+Flags:
+- `--quick` — skip ⚡light steps (Step 4 DEPENDENCY-MAP)
+- `--no-chain` — defer Step 11 causal-chain emission (non-prod bugs)
+- `--bug-slug=<X>` — override auto-slug derivation
+- `--dry-run` — walk all steps non-interactively, emit fixture state without prompting
+
+Per-step artifacts under `~/.ship/<bug-slug>/{state,experiments}/`. Final ledger entry in `~/NardoWorld/realize-debt.md` with `mode: bug`.
+
+### `/debug list`
+Reads `~/NardoWorld/realize-debt.md`, returns most-recent 20 entries grouped by status. Read-only, no write.
+
+### `/debug drift` / `flaky` / `performance`
+Stubbed — return `MODE_NOT_YET_SHIPPED`. Master plan §3 17-step engine reused; mode-specific compression matrix ships in S8.
+
+## Implementation
+
+`bin/debug.py` is the deterministic entrypoint (rule-based per CLAUDE.md "Rule-based > LLM for local classifiers"). `bin/_disc.py` provides shared discipline writers (observations / rounds / causal-chain / atomic ledger). Skill instructions delegate verb dispatch to that script:
+
+```bash
+python3 ~/.claude/skills/debug/bin/debug.py check <target>
+python3 ~/.claude/skills/debug/bin/debug.py bug "<symptom>"
+python3 ~/.claude/skills/debug/bin/debug.py list
+```
+
+The script reads Phase 4 JSON files only; no LLM calls. Ledger writes are fcntl-locked + atomic (closes S1 D1). Feature matcher normalizes kebab/camel/snake/lower variants (closes S1 D2). Skill body (this file) explains the model and routing; phase files explain per-mode semantics.
+
+## /ship discipline cross-refs (per master plan §6)
+
+When invoked inside a /ship debug round (N>1 attempts on same bug), the wiring/bug phase files MUST cite:
+- `~/.claude/skills/ship/phases/common/observations.md` — every live observation routes here as `[single-point]` / `[N-comparison]` / `[isolation-verified]`
+- `~/.claude/skills/ship/phases/common/rounds.md` — round N+1 must log SHA + claimed-vs-actual variables
+- `~/.claude/CLAUDE.md` → Causal-claim gate (3-question gate before any causal verb) + Multi-round confound check (premise inheritance)
+- `~/.claude/rules/ship.md` → Debug-round isolation discipline + Causal chain completeness
+
+These rules are enforced by the calling /ship phase, not by this skill. /debug provides verdict + evidence; /ship enforces process discipline around the verdict.
+
+## Ledger
+
+All writes to `~/NardoWorld/realize-debt.md` flow through this skill (per master plan §6 — ledger writer ownership). Schema = master plan §9. ID format `R-NNNN`. Append-only. Atomic writes via `bin/_disc.atomic_ledger_append()` (fcntl LOCK_EX + tmpfile + os.replace).

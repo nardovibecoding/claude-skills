@@ -15,6 +15,18 @@ Same core loop as bot variant + app-specific additions.
 - Before each Edit — Read full file first
 - Touch-and-go pattern — smallest compile-passing change first, expand incrementally
 
+## Inherited claims gate (mandatory before skipping any "already done" item)
+
+When a prior phase artifact (Phase 2 plan, prior /ship round, monitor report, agent self-report) marks an item as "already done" / "already shipped" / "no edit needed":
+
+- Phase 3 MUST re-verify per `strict-execute §0.6 Premise Re-verification` BEFORE skipping that item.
+- Failure to re-verify = item is treated as un-shipped, full execute applies.
+- Document each inherited claim + its re-verification evidence in `.ship/<feature>/experiments/03-execution-log.md` under a new top section: `## Inherited Claims Audit`.
+
+Persistence + run-the-thing per slice (mandatory, see `strict-execute §5.5` and `§5.6`):
+- Every Write/Edit must be followed by an immediate Read on the same path to confirm diff persisted.
+- Every producer/script edit must be followed by an actual invocation + mtime delta + output cat.
+
 ## Per slice (shared with bot)
 
 1. Code change (one logical concern)
@@ -26,16 +38,44 @@ Same core loop as bot variant + app-specific additions.
 7. **Rollback point tagged** — `git tag ship-<feature>-slice-N`
 8. **Rule 8 audit trigger** — if 3rd+ change to same file
 
-## Error recovery — 6-step Debug Protocol
+## Error recovery — Debug Protocol
 
-1. **Reproduce reliably** — preserve evidence
-2. **Localize layer** — UI / API / data / build / external / network
+### Step 0 — Triage gate (classify before protocol fires)
+
+- **TRIVIAL** — typo, obvious syntax error, missing import, stale cache, build glitch. Fix + verify, skip steps 1-6. Max 2 attempts before promoting to non-trivial.
+- **NON-TRIVIAL** — unexpected behavior, intermittent, cross-layer symptom, state corruption, race, hydration/SSR flake, flaky test. Full protocol below is MANDATORY.
+
+Write the classification in chat before touching code. One word. If unsure, default to NON-TRIVIAL.
+
+### Step 0.5 — Reproduction gate (hard gate on NON-TRIVIAL)
+
+Written repro MUST exist before step 1 fires:
+- command/URL/click-path that triggers the failure, OR
+- exact user action + state preconditions + expected vs actual + browser/viewport if UI
+
+No repro = no fix.
+
+### Step 0.75 — Hypothesis template (hard gate on NON-TRIVIAL, before step 4)
+
+```
+SYMPTOM:     <what the user/browser/console observes>
+EVIDENCE:    <console log, network panel, stack trace — cite line numbers>
+ROOT CAUSE:  <why the bug exists, stated as a causal claim>
+PROPOSED FIX: <what change, at which file:line, and why it addresses root cause>
+```
+
+If ROOT CAUSE restates SYMPTOM, iterate. Evidence must support the causal claim.
+
+### 6-step protocol (NON-TRIVIAL only)
+
+1. **Reproduce reliably** — confirm repro from step 0.5 fires on demand
+2. **Localize layer** — UI / API / data / build / external / network / auth / cache
 3. **Reduce to minimal case**
-4. **Fix root cause, not symptom** (rule 55)
+4. **Fix root cause per hypothesis** — apply PROPOSED FIX. If fix diverges mid-edit, STOP and rewrite hypothesis.
 5. **Guard against recurrence** — test / log / monitor
-6. **Verify end-to-end**
+6. **Verify end-to-end** — full user flow, not just the fixed component
 
-**Trip-wire:** 3 fails on same issue → STOP, spawn strict-plan subagent.
+**Trip-wire:** 3 fails on same issue → STOP, spawn strict-plan subagent with hypothesis block + repro + what-was-tried as brief.
 
 ## Rate-limit awareness
 

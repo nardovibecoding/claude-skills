@@ -79,6 +79,12 @@ find ~/.ship/ -maxdepth 2 -name "05-monitor.md" 2>/dev/null
 
 **strict-plan** — use for discovery + classification. **strict-execute** — use for applying UPDATE/CONSOLIDATE/REPLACE changes.
 
+## Cross-references
+
+- `~/.claude/skills/ship/phases/common/observations.md` — when a refresh sweep cites a live observation (e.g. "lesson references file X but file X no longer exists"), route through observations.md before claiming the lesson is stale. A lesson cannot be downgraded to REPLACE/DELETE based on a `[single-point]` observation.
+- `~/.claude/skills/ship/phases/common/rounds.md` — when refresh sweeps a debug-bug lesson that reference Round N rounds, verify the round's git SHA still exists. A vanished SHA forces the lesson to UPDATE (note round inaccessible) not REPLACE.
+- `~/.claude/CLAUDE.md` → Causal-claim gate (refresh sweep is itself a causal-claim engine — "this lesson is stale because X changed").
+
 ## SPREAD/SHRINK pass (required before closing)
 
 **SPREAD (L1-L5):**

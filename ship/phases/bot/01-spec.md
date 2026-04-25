@@ -58,13 +58,87 @@ Each AC must also carry a REQ-ID (e.g. `REQ-01`) for adversarial audit citation.
    - Wallet exposure flag (Y/N — if Y, Principle 7 gates extra safety)
    - Failure modes + rollback path
 
+## §2.6 CAUSAL CHAIN (required when mode = audit OR feature slug contains "debug"/"wedge"/"crash"/"hang"/"leak")
+
+Numbered chain from trigger → observed effect. Every step must have either:
+- `[cited]` — concrete evidence (file:line, log line, strace output, config snapshot), OR
+- `[GAP — unverified]` — explicit unknown, must be resolved before Phase 2 closes
+
+Zero `???` gaps. Zero "assumed" without label. A chain with any unlabeled leap = phase does not close.
+
+**Reachability gate:** every code path cited in a step must be proven REACHABLE under the test configuration that produced the evidence. If the citation is `foo.ts:123` but an upstream filter/gate/short-circuit prevents execution from reaching line 123 under the relevant config, the citation is invalid and the step reverts to `[GAP — unverified]`. Example failure: claiming `basketAtomicity` code caused a wedge when `disabledSources` strips all signals before they reach the basketAtomicity check.
+
+Format:
+```
+Step 0 (trigger):  <user/config/event action> [cited §0.x]
+Step 1:            <first downstream effect> [cited §0.x]
+Step 2:            <next effect> [GAP — unverified, experiment E1 in §X.9 would close]
+...
+Step N (observed): <wedge/crash/leak fingerprint> [cited §0.x]
+```
+
+## §2.7 PREMISE AUDIT (required when audit inherits claims from prior debug rounds OR prior shipped features)
+
+List every premise this phase builds on from earlier work. For each:
+- Source (convo ID, commit SHA, prior ship slug, or lesson file)
+- Original evidence cited in source
+- Verification status: `[verified]` / `[unverified — blocks next phase]` / `[partial]`
+
+Inherited premises are NOT evidence. A premise with `[unverified — blocks next phase]` forces Phase 2 to either close the gap first or abandon the dependent path.
+
+Example:
+```
+- "round 5 isolation showed flag X causes wedge" (source: convo_2026-04-24)
+  Original evidence: log fingerprint, no config snapshot captured.
+  Status: [unverified — blocks next phase]. Confounders possible: different commit, different disabledSources.
+  Closure: re-run 3×20-min cycle with git-snapshotted config.
+```
+
+## §X.9 OPEN GAPS (required at every phase close, all phases)
+
+Every phase ends with an explicit gap list, tagged:
+- `[resolved]` — closed within this phase
+- `[carry]` — carries forward but does not block next phase
+- `[blocks-next]` — must resolve before next phase starts
+
+Phase close FAILS if any `[blocks-next]` is unresolved. Auto-mode halts at a `[blocks-next]` regardless of approval settings.
+
+## §4.5 Information Architecture (mandatory when target renders user-visible output)
+
+Triggers: dashboard, app, CLI output, Telegram reply, report, markdown, HTML, any user-facing text or visual.
+
+### IA-1 Taxonomy schema
+- Define named categories (3-6 top-level) before writing any label.
+- Every user-visible item must belong to exactly one category.
+- Siblings within a category must use parallel structure (all verb-phrases, or all noun-phrases, never mixed).
+
+### IA-2 Stranger test per label
+Every user-facing label must pass: "Would someone who's never used this app understand what this means?"
+- Reject: bare shorthand (`heartb`, `upgr`, `digest`)
+- Reject: under-scoped labels ("End-to-end test" without saying which system)
+- Reject: orphaned internal slugs (`bigd-pull@mac` shown raw in UI)
+- Accept: action + scope qualifier ("Heartbeat files fresh", "Daily bundle generated")
+
+### IA-3 Sort order
+Specify sort discipline:
+- Flow direction (input → processing → output)
+- Priority (urgent → waiting → done)
+- Alphabetical (only when no meaningful order exists)
+- Never: insertion order / implementation-detail order
+
+### IA-4 Category prefix consistency
+Use same emoji/prefix for same category across all views. Define once at spec level.
+
+Phase 1 cannot close if UI-producing target has any §4.5 item unanswered.
+
 ## §6.5 Adversarial SPEC Audit (required before gate)
 
 After all steps above, spawn a second `strict-plan` invocation with default stance: **"this SPEC has defects — find them."**
 
 The adversarial auditor MUST:
 - Cite specific REQ-IDs for each defect found
-- Flag: EARS violation, missing counterpart action, unmeasurable AC, undefined terms, contradictions
+- Flag: EARS violation, missing counterpart action, unmeasurable AC, undefined terms, contradictions, bare-label (shorthand without expansion), under-scoped-label (label lacks scope qualifier), mixed-taxonomy (siblings use different category schemas), orphaned-slug (internal identifier leaked to UI)
+- IA defect types (bare-label, under-scoped-label, mixed-taxonomy, orphaned-slug) = CRITICAL in MVP user-visible output, MINOR only in debug/dev paths
 - Return PASS only if zero CRITICAL defects found
 - Any CRITICAL defect = Phase 1 CANNOT close
 

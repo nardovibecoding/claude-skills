@@ -15,6 +15,18 @@ Build loop. Core execution — strengthened bookends stop shortcutting.
 - **Before each Edit** — Read full file first (rule already in system prompt, enforce here)
 - **Touch-and-go pattern** — smallest compile-passing change first, expand incrementally
 
+## Inherited claims gate (mandatory before skipping any "already done" item)
+
+When a prior phase artifact (Phase 2 plan, prior /ship round, monitor report, agent self-report) marks an item as "already done" / "already shipped" / "no edit needed":
+
+- Phase 3 MUST re-verify per `strict-execute §0.6 Premise Re-verification` BEFORE skipping that item.
+- Failure to re-verify = item is treated as un-shipped, full execute applies.
+- Document each inherited claim + its re-verification evidence in `.ship/<feature>/experiments/03-execution-log.md` under a new top section: `## Inherited Claims Audit`.
+
+Persistence + run-the-thing per slice (mandatory, see `strict-execute §5.5` and `§5.6`):
+- Every Write/Edit must be followed by an immediate Read on the same path to confirm diff persisted.
+- Every producer/daemon/script edit must be followed by an actual invocation + mtime delta + output cat.
+
 ## Per slice
 
 1. Code change (one logical concern)
@@ -26,18 +38,48 @@ Build loop. Core execution — strengthened bookends stop shortcutting.
 7. **Rollback point tagged** — `git tag ship-<feature>-slice-N` (cheap insurance)
 8. **Rule 8 audit trigger** — if 3rd+ change to same file, full audit of interacting parts before proceeding
 
-## Error recovery — 6-step Debug Protocol
+## Error recovery — Debug Protocol
 
-When bug/failure encountered mid-slice, run this sequence (not just "retry with flag tweaks"):
+### Step 0 — Triage gate (classify before protocol fires)
 
-1. **Reproduce reliably** — make failure happen on demand. If intermittent, capture timing/state/env. Preserve evidence: logs, error output, stack trace.
+Classify the bug in one line before entering full protocol:
+
+- **TRIVIAL** — typo, obvious syntax error, missing import, stale cache, copy-paste miss. Fix + verify, skip steps 1-6. Max 2 attempts before promoting to non-trivial.
+- **NON-TRIVIAL** — anything else: unexpected behavior, intermittent failure, cross-layer symptom, external service flake, state corruption, race. Full protocol below is MANDATORY.
+
+Write the classification in chat before touching code. One word: `TRIVIAL` or `NON-TRIVIAL`. If unsure, default to NON-TRIVIAL.
+
+### Step 0.5 — Reproduction test (hard gate on NON-TRIVIAL)
+
+Before step 1 fires, a written repro MUST exist. Form:
+- command/script that triggers the failure, OR
+- exact user action + state preconditions + expected vs actual
+
+Repro goes into the slice's debug log before any fix code is written. No repro = no fix. This blocks "I think I know what it is" speculative patches.
+
+### Step 0.75 — Hypothesis template (hard gate on NON-TRIVIAL, before step 4)
+
+Before editing code to fix, write this 4-field block in chat or in the debug log:
+
+```
+SYMPTOM:     <what the user/system observes>
+EVIDENCE:    <logs, stack trace, repro output — cite line numbers>
+ROOT CAUSE:  <why the bug exists, stated as a causal claim>
+PROPOSED FIX: <what change, at which file:line, and why it addresses root cause>
+```
+
+If ROOT CAUSE reads like "X doesn't work" (restates symptom), the hypothesis is not ready. Iterate. Evidence must support the causal claim, not just the symptom.
+
+### 6-step protocol (NON-TRIVIAL only)
+
+1. **Reproduce reliably** — confirm repro from step 0.5 fires on demand. Capture timing/state/env if intermittent.
 2. **Localize layer** — UI / API / data / build / external service / cron / env / network / wallet. Narrow to ONE layer before fixing.
 3. **Reduce to minimal case** — strip unrelated code. Smallest script/input that still fails.
-4. **Fix root cause, not symptom** — rule 55 internalized. If fix doesn't explain WHY the bug existed, it's a patch. Spawn strict-plan subagent for deep audit if stuck.
+4. **Fix root cause per hypothesis** — apply PROPOSED FIX from step 0.75. If fix diverges from hypothesis mid-edit, STOP and rewrite hypothesis first.
 5. **Guard against recurrence** — add a log line, assertion, or cron check that would have caught this earlier. For bots: often a health check or log pattern scanner.
 6. **Verify end-to-end** — run full slice flow, not just the fixed function. Rule 54.
 
-**Trip-wire:** 3 fails on same issue → STOP, spawn strict-plan subagent for root-cause audit before retrying.
+**Trip-wire:** 3 fails on same issue → STOP, spawn strict-plan subagent with the hypothesis block + repro + what-was-tried as the brief. Do not retry without new evidence.
 
 ## Rate-limit awareness
 

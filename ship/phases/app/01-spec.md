@@ -54,13 +54,42 @@ Each AC must also carry a REQ-ID (e.g. `REQ-01`) for adversarial audit citation.
 9. **Success metrics** — user-visible KPIs (sign-ups, retention, revenue — not code metrics)
 10. **Deps + risks** — upstream deps + user safety risks (auth, payments, PII)
 
+## §4.5 Information Architecture (mandatory when target renders user-visible output)
+
+Triggers: dashboard, app, CLI output, Telegram reply, report, markdown, HTML, any user-facing text or visual.
+
+### IA-1 Taxonomy schema
+- Define named categories (3-6 top-level) before writing any label.
+- Every user-visible item must belong to exactly one category.
+- Siblings within a category must use parallel structure (all verb-phrases, or all noun-phrases, never mixed).
+
+### IA-2 Stranger test per label
+Every user-facing label must pass: "Would someone who's never used this app understand what this means?"
+- Reject: bare shorthand (`heartb`, `upgr`, `digest`)
+- Reject: under-scoped labels ("End-to-end test" without saying which system)
+- Reject: orphaned internal slugs (`bigd-pull@mac` shown raw in UI)
+- Accept: action + scope qualifier ("Heartbeat files fresh", "Daily bundle generated")
+
+### IA-3 Sort order
+Specify sort discipline:
+- Flow direction (input → processing → output)
+- Priority (urgent → waiting → done)
+- Alphabetical (only when no meaningful order exists)
+- Never: insertion order / implementation-detail order
+
+### IA-4 Category prefix consistency
+Use same emoji/prefix for same category across all views. Define once at spec level.
+
+Phase 1 cannot close if UI-producing target has any §4.5 item unanswered.
+
 ## §6.5 Adversarial SPEC Audit (required before gate)
 
 After all steps above, spawn a second `strict-plan` invocation with default stance: **"this SPEC has defects — find them."**
 
 The adversarial auditor MUST:
 - Cite specific REQ-IDs for each defect found
-- Flag: EARS violation, missing counterpart action, unmeasurable AC, undefined terms, contradictions
+- Flag: EARS violation, missing counterpart action, unmeasurable AC, undefined terms, contradictions, bare-label (shorthand without expansion), under-scoped-label (label lacks scope qualifier), mixed-taxonomy (siblings use different category schemas), orphaned-slug (internal identifier leaked to UI)
+- IA defect types (bare-label, under-scoped-label, mixed-taxonomy, orphaned-slug) = CRITICAL in MVP user-visible output, MINOR only in debug/dev paths
 - Return PASS only if zero CRITICAL defects found
 - Any CRITICAL defect = Phase 1 CANNOT close
 

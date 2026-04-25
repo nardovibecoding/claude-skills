@@ -25,6 +25,15 @@ documents:
 
 5-phase bookended discipline. Per-mode phase files loaded on demand.
 
+## Iron Laws (shared preamble — see `~/.claude/skills/_iron_laws.md`)
+
+```
+NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+Source: obra/superpowers (MIT). Apply to every /ship phase: any code-change phase obeys law #1; every phase close obeys law #2. Phase artifacts that violate either are rejected.
+
 ## Dispatch
 
 On invoke, identify:
@@ -42,7 +51,7 @@ On invoke, identify:
 
 ## Phase 0 — Recall (skip with `--cold` flag)
 
-Before Phase 1 fires, grep prior art for the feature slug tokens:
+Before Phase 1 fires, grep prior art for the feature slug tokens across 5 sources (extended per master-debug §20 lever F):
 
 ```bash
 # 1. Prior .ship monitor lessons (both global ~/.ship and per-project $cwd/.ship)
@@ -53,9 +62,17 @@ grep -rl "<slug-tokens>" ~/.claude/projects/-Users-bernard/memory/lesson_*.md 2>
 
 # 3. NardoWorld lessons
 grep -rl "<slug-tokens>" ~/NardoWorld/lessons/*.md 2>/dev/null | head -5
+
+# 4. /debug realization-debt ledger — open wiring/orphan/drift debt on this surface
+grep -B1 -A5 "<slug-tokens>" ~/NardoWorld/realize-debt.md 2>/dev/null | head -30
+
+# 5. /debug orphan registry — partial-built features, idle installs, stale memory todos
+python3 -c "import json; r=json.load(open('${HOME}/NardoWorld/meta/orphan_registry.json')); m=[e for e in r.get('entries',[]) if any(t in (e.get('file','')+e.get('context','')).lower() for t in '<slug-tokens>'.lower().split())]; print('\n'.join(f'{e[\"id\"]} {e[\"file\"]}:{e[\"line\"]} ({e[\"tag\"]}, {e[\"age_days\"]}d)' for e in m[:5]))" 2>/dev/null
 ```
 
-Take top-5 matches across all three sources. Inject as **PRIOR ART** section at top of Phase 1 brief. Rule-based grep only — no LLM. If zero matches, note "no prior art found" and continue.
+Take top-5 matches across all five sources. Inject as **PRIOR ART** section at top of Phase 1 brief. Rule-based grep only — no LLM. If zero matches, note "no prior art found" and continue.
+
+**Per master-debug §20 #10 + #11:** open ledger/orphan entries on related surface become Phase 1 risk inputs (#10) and Phase 1 "is this already partially built" signal (#11).
 
 ## Phase flow (lazy-load)
 
@@ -89,14 +106,31 @@ Audit mode (`ship audit <project>`):
 - Phase 4: strict-plan (security + regression)
 - Phase 5: strict-review (post-audit recommendations)
 
+## Premise re-verification (HARD RULE)
+
+Any claim that work is "already done" from a prior phase or prior /ship round must be re-verified live in the current session per `strict-execute §0.6 Premise Re-verification`. The phase artifact's word is NOT evidence; the live system state is. Skipping this verification is a P0 process failure — escalate to Bernard if unsure.
+
+## Cross-artifact + chain + return + UI gates (HARD RULE)
+
+Per strict-execute §5.7 (producer→consumer chain), §5.9 (UI bug deferral), and §EXIT.1 (self-honesty return), AND per all-agent §0.7 (cross-artifact inheritance gate): no /ship phase closes if any of the 4 gates failed. P0 process failure on violation.
+
+Operational hooks:
+- Phase 3 (EXECUTE) — see `Inherited claims gate` in `phases/<bot|app>/03-execute.md`. All inherited claims must land in `.ship/<feature>/experiments/03-execution-log.md` under `## Inherited Claims Audit` with live-session evidence blocks.
+- Forbidden phrase list (without an immediate evidence block): "already exists", "already shipped", "no edit needed", "verified in source", "code already does X", "shipped in prior round", "previously verified", "already in place", "no change required". See strict-execute §0.6 for the full gate.
+
 ## SPREAD/SHRINK checklist (required per phase)
 
-**SPREAD (L1-L5):**
+**SPREAD (L1-L6):**
 - L1 Lifecycle — create + update + retire covered?
 - L2 Symmetry — every action has counterpart (write+delete, enable+disable)?
 - L3 Time-lens — 1d / 30d / 365d behavior considered?
 - L4 Scale — works at 10x inputs?
 - L5 Resources — CPU/disk/network/tokens accounted for?
+- L6 Legibility — user-visible output only: does every label pass the stranger test? Is every item grouped in a named category with siblings parallel-structured? Is sort order meaningful? When target has no user-visible output, mark L6 "N/A — no UI surface." When L6 fails, treat as §2 Diagnosis item, not just a SPREAD note.
+
+## Information Architecture gate (Phase 1 summary)
+
+When the feature produces user-visible output (dashboard, app, CLI output, Telegram reply, report, markdown, HTML, any user-facing text or visual), Phase 1 SPEC cannot close until §4.5 Information Architecture is complete: taxonomy schema (3-6 named categories, every item in exactly one, siblings parallel-structured), stranger test per label (no bare shorthand, no under-scoped labels, no orphaned internal slugs), sort order discipline (flow/priority/alphabetical, never insertion order), and category prefix consistency. See phases/bot/01-spec.md §4.5 and phases/app/01-spec.md §4.5.
 
 **SHRINK (Sh1-Sh5):**
 - Sh1 Duplication — same logic repeated elsewhere?

@@ -48,6 +48,19 @@ Post-production bookend — discipline gate before declaring done.
    ```
 8. **Push via singlesourceoftruth** — git push + vpssync. Rule C7.
 
+## Verdict compression (evidence-driven Phase 4 cadence)
+
+The default observation cadence is "deploy slice K → observe T+30min → deploy slice K+1". This is a CEILING, not a floor. Verdict can fire earlier when evidence is decisive.
+
+V1 verdict closes as soon as ANY of these is true:
+- **Fingerprint window cleanly closed** — for bug fixes, the regression's known fingerprint window (e.g. T+7-10min for a wedge) passes without symptom recurrence. Document in observation log with `[isolation-verified, N=X]` label.
+- **N=2 single-point comparison forms a fingerprint match** — pre-fix observation + post-fix observation, same conditions, both labelled. If they match the prior bug pattern, V1 = NEGATIVE; if post-fix observation diverges in the right direction, V1 = POSITIVE.
+- **T+30 reached** — the upper bound; if no decisive evidence sooner, the full window runs.
+
+Compressed verdict MUST be documented in the observation log with explicit "verdict at T+X (compressed from T+30 ceiling) because <fingerprint window | N=2 comparison>". Sequential-deploy mandate is preserved — it's about variable attribution, not about wall-clock duration. Skipping the wait when verdict is already in is correct discipline, not cutting corners.
+
+Source: pm-london wedge 2026-04-25 — L1 wedge confirmed at T+11min, but protocol held us at T+30 ceiling, costing ~15 min before L3 deploy.
+
 ## Artifact
 
 `.ship/<feature>/04-land.md` (security scan results, regression notes, perf deltas)
