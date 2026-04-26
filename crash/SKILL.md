@@ -63,6 +63,13 @@ Keep each file <80 lines. Skip jsonls that are pure tool-noise with no substanti
 
 After writing each convo file, append a checkpoint entry to CKPT via `bash ~/.claude/scripts/atomic_append.sh`. Schema: `{"session_id":"<basename>","last_msg_uuid":"<tail user/assistant uuid>","saved_at":"<UTC ISO>","kind":"crash","convo_file":"<path>"}`. Future /s and /crash invocations will then skip this session.
 
+### C2) Mac↔Hel sync (fire-and-forget)
+After all checkpoint appends, kick off the shared sync helper so the recovered convo files + any other uncommitted Mac changes in `memory/` + `~/NardoWorld/` get pulled-rebased + committed + pushed to Hel. Detached, never blocks the report:
+```bash
+nohup bash ~/.claude/scripts/sync_mac_vps.sh crash-skill >/dev/null 2>&1 &
+```
+Log: `/tmp/sync_mac_vps.log`.
+
 ### D) Report
 Report back in <300 words:
 - N jsonls scanned, N already-saved (skipped), N newly saved, N skipped as trivial.

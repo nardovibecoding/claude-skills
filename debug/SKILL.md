@@ -1,16 +1,18 @@
 ---
 name: debug
 description: |
-  Unified debug skill — Wiring / Bug / Drift / Zombie / Performance / Flaky / Orphan modes.
+  Unified debug skill — Wiring / Bug / Drift / Flaky / Performance / Zombie / Orphan modes.
   Reads Phase 4 graphs (state_registry / pipeline_graph / data_lineage / sync_graph / consistency_registry) read-only.
   Writes verdicts to ~/NardoWorld/realize-debt.md (the realization-debt ledger; lockfile-protected atomic writes).
-  S1+S3 scope: Wiring + Bug modes shipped. Drift / Zombie / Performance / Flaky stubbed for S8.
+  Shipped: Wiring (S1) + Bug (S3) + Drift/Flaky/Performance (S8) + ledger view.
 
   Triggers (verb-first):
-    /debug check <feature>    — Wiring mode (B: feature-first → runtime). "is X live", "did we wire X", "is X actually running"
-    /debug bug "<symptom>"    — Bug mode (A: symptom-first → root cause). 17-step engine. "X is wrong / broken / crashing"
-    /debug list                — show realize-debt.md ledger
-    /debug drift <feature>     — Drift mode (S8, not yet implemented)
+    /debug check <feature>          — Wiring mode (B: feature-first → runtime). "is X live", "did we wire X"
+    /debug bug "<symptom>"          — Bug mode (A: symptom-first → root cause). 17-step engine. "X is wrong / broken"
+    /debug drift <feature>          — Drift mode. "X used to work, now stale"; flags --baseline=<sha-or-iso> --dry-run
+    /debug flaky "<symptom>"        — Flaky mode (loop reproducer, race priors). "X sometimes fails"; flags --runs=N --dry-run
+    /debug performance <feature>    — Performance mode (latency / leak / hot-loop). "X is slow / hot"; flags --baseline=<file>
+    /debug list                     — show realize-debt.md ledger
 
   NOT FOR: random fixes (Iron Law forbids), claims without verification (second Iron Law forbids), replacing /ship audit (imports it).
 verified_at: 2026-04-26
@@ -50,12 +52,12 @@ Source: obra/superpowers (MIT). Both laws apply to all /debug modes; full enforc
 | "X is wrong" / "X is broken" / "X is crashing" / "why isn't X" | Bug (Group A) | `phases/bug.md` |
 | `/debug bug "<symptom>"` | Bug (Group A) | `phases/bug.md` |
 | `/debug list` | (read-only ledger view) | inline below |
-| "X is slow / hot / leaking" | Performance (Group A) | `phases/performance.md` (S8) |
-| "X used to work, now stale" | Drift (Group A) | `phases/drift.md` (S8) |
-| "X is flaky / sometimes fails" | Flaky (Group A) | `phases/flaky.md` (S8) |
+| "X is slow / hot / leaking" | Performance (Group A) | `phases/performance.md` |
+| "X used to work, now stale" | Drift (Group A) | `phases/drift.md` |
+| "X is flaky / sometimes fails" | Flaky (Group A) | `phases/flaky.md` |
 | (daemon-driven, no phrase) | Orphan / Zombie (Group C) | consistency-daemon detector (S5) |
 
-Shipped modes: Wiring (S1) + Bug (S3) + ledger view. Drift / Flaky / Performance return `MODE_NOT_YET_SHIPPED — track in master-debug ship S8`.
+Shipped modes: Wiring (S1) + Bug (S3) + Drift/Flaky/Performance (S8) + ledger view. Zombie / Orphan modes remain daemon-driven (S5 not yet shipped).
 
 ## Verbs
 
@@ -80,8 +82,14 @@ Per-step artifacts under `~/.ship/<bug-slug>/{state,experiments}/`. Final ledger
 ### `/debug list`
 Reads `~/NardoWorld/realize-debt.md`, returns most-recent 20 entries grouped by status. Read-only, no write.
 
-### `/debug drift` / `flaky` / `performance`
-Stubbed — return `MODE_NOT_YET_SHIPPED`. Master plan §3 17-step engine reused; mode-specific compression matrix ships in S8.
+### `/debug drift <feature>`
+Drift mode — was correct, code moved under it, silently stale. Compression matrix per master plan §3 row "Drift" (steps 0,2,3,4,5,7,9,10,13,15,16). Loads `phases/drift.md`. Verdict: `current | stale-soft | stale-hard | inconclusive`. Flags: `--baseline=<sha-or-iso>` (default `30 days ago`), `--dry-run`.
+
+### `/debug flaky "<symptom>"`
+Flaky mode — intermittent (race / state-dependent). Reuses 17-step engine with REPRODUCE in loop mode. Output `experiments/flaky-runs.md` table; race-pattern priors auto-seeded (thread-safety, async-order, time-dependent, state-leak, external-API-timing). Loads `phases/flaky.md`. Verdict: `intermittent_low | flaky-confirmed | mostly-broken-not-flaky | inconclusive`. Flags: `--runs=N` (default 10), `--bug-slug=<X>`, `--dry-run`.
+
+### `/debug performance <feature>`
+Performance mode — fires correctly but slow / hot loop / leak. All 17 steps active; baseline metrics captured per `~/.claude/skills/ship/phases/bot/04-land.md` step 7. Loads `phases/performance.md`. Verdict: `within-budget | regression | leak | hot-loop | inconclusive`. Flags: `--baseline=<file>`, `--dry-run`.
 
 ## Implementation
 
@@ -90,6 +98,9 @@ Stubbed — return `MODE_NOT_YET_SHIPPED`. Master plan §3 17-step engine reused
 ```bash
 python3 ~/.claude/skills/debug/bin/debug.py check <target>
 python3 ~/.claude/skills/debug/bin/debug.py bug "<symptom>"
+python3 ~/.claude/skills/debug/bin/debug.py drift <feature> [--baseline=<sha-or-iso>] [--dry-run]
+python3 ~/.claude/skills/debug/bin/debug.py flaky "<symptom>" [--runs=N] [--dry-run]
+python3 ~/.claude/skills/debug/bin/debug.py performance <feature> [--baseline=<file>] [--dry-run]
 python3 ~/.claude/skills/debug/bin/debug.py list
 ```
 

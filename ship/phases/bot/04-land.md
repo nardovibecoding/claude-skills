@@ -29,8 +29,26 @@ Post-production bookend — discipline gate before declaring done.
    - Write `.ship/<slug>/state/04-land-exception.md`
    - Include: CRITICAL finding description, why it cannot be fixed now, Bernard-approved justification (explicit ack required — auto-mode cannot approve)
    - Exception file must exist AND have Bernard's ack string before Phase 4 can close
-5. **Dry-run/paper flip** (trading code) — 15-min paper mode run before live flip. Balance unchanged = proceed.
-6. **Performance check (bot-specific)** — Measure → Identify → Fix → Verify → Guard:
+5. **Wiring-check via /debug (HARD GATE — master plan §6)** — for every named feature delivered in this slice, run:
+   ```bash
+   python3 ~/.claude/skills/debug/bin/debug.py check <host>:<feature>
+   ```
+   Parse the `--- /debug check <target> → verdict: <X> ---` line. Per CLAUDE.md "compiles ≠ works" Realization Check, only `verdict: wired` allows phase close. `not_wired`, `partial`, `inconclusive` BLOCK Phase 4 close — fail-closed, no `--force` override.
+
+   **Why:** /debug check confirms (a) process is ACTIVE in state_registry, (b) ship-log feature evidence ≤48h old, (c) Phase 4 graphs reference the feature. Build passing means nothing if the named feature isn't actually live in the running process. This gate converts the soft Realization Check into an enforced phase-close condition.
+
+   **Ledger writer ownership:** /debug writes `~/NardoWorld/realize-debt.md` automatically. /ship NEVER writes the ledger directly — only reads back the verdict. Idempotency: /debug dedups against existing entries by `(ship_slug, feature, host)`, so re-running the check during a Phase 4 retry is safe.
+
+   **The ONLY way to close Phase 4 with verdict ≠ wired:**
+   - Write `.ship/<slug>/state/04-wiring-override.md`
+   - Include: feature name, current verdict, why it cannot reach `wired` now (e.g. "feature is data-producer; downstream consumer ships next slice"), Bernard-approved justification (explicit ack required — auto-mode cannot approve)
+   - Override file must exist AND have Bernard's ack string before phase close
+   - Override is logged in the ledger entry as `--ship-override-wiring=advisory`
+
+   **Feature naming:** pull from Phase 1 spec §EARS ACs ("the system shall..."). One /debug check per acceptance-criterion-named feature. If 3 ACs name 3 features, run 3 checks.
+
+6. **Dry-run/paper flip** (trading code) — 15-min paper mode run before live flip. Balance unchanged = proceed.
+7. **Performance check (bot-specific)** — Measure → Identify → Fix → Verify → Guard:
    - **Scan loop rate** vs baseline (scans/min)
    - **Order fill latency** P50 / P99 (ms)
    - **Memory growth** over last 1h (MB/hr — alarm if >10MB/hr trend)
@@ -42,11 +60,11 @@ Post-production bookend — discipline gate before declaring done.
    - **N+1 query patterns** — batch fetches where possible
    - **Unbounded caches** — flagging growth
    - **Principle:** profile before optimizing. Measure baseline FIRST, optimize only what shows up.
-7. **Lightweight CHANGELOG** — append to `~/NardoWorld/CHANGELOG.md`:
+8. **Lightweight CHANGELOG** — append to `~/NardoWorld/CHANGELOG.md`:
    ```
    YYYY-MM-DD | <feature> | <one-line why>
    ```
-8. **Push via singlesourceoftruth** — git push + vpssync. Rule C7.
+9. **Push via singlesourceoftruth** — git push + vpssync. Rule C7.
 
 ## Verdict compression (evidence-driven Phase 4 cadence)
 
