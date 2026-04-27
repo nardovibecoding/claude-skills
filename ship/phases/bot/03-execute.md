@@ -2,6 +2,10 @@
 
 Build loop. Core execution — strengthened bookends stop shortcutting.
 
+## Heuristic validation gate (HARD)
+
+If EXECUTE ships a regex / classifier / scorer / router / pattern-matcher / threshold, the heuristic must have an `experiments/heuristic-validation.md` with held-out recall ≥80% and FP <10% per `~/.claude/skills/ship/phases/common/heuristic-validation.md`. If Phase 2 deferred this measurement, EXECUTE runs it before write. Do NOT ship a heuristic with held-out recall <60% or FP >30%.
+
 ## OUTPUT CONTRACT (enforced for owning strict-* agents)
 
 - WRITE the full brief to `.ship/<feature>/0N-<phase>.md` via the Write tool.

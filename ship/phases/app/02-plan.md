@@ -2,6 +2,10 @@
 
 gstack's autoplan: parallel lens reviews, auto-decide 80%, surface only User-Challenges + Taste-Decisions.
 
+## Heuristic validation gate (HARD)
+
+If this PLAN produces a regex / classifier / scorer / router / pattern-matcher / threshold / promotion-criteria, follow `~/.claude/skills/ship/phases/common/heuristic-validation.md`. Author-generated retro-test does NOT close the phase. Held-out corpus (≥30 unseen TPs + ≥200 random for FP) required, written to `experiments/heuristic-validation.md`. Reject phase if recall <60% or FP >30%.
+
 ## OUTPUT CONTRACT (enforced for owning strict-* agents)
 
 - WRITE the full brief to `.ship/<feature>/0N-<phase>.md` via the Write tool.
