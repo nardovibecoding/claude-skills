@@ -25,7 +25,7 @@ A widget without declared lineage is a future stale-light bug. The lineage table
 
 ## §2. Widget lineage table (required content)
 
-For every visible widget, fill all 6 fields:
+For every visible widget, fill all 7 fields:
 
 ```
 ### Widget: <human-readable name>
@@ -36,6 +36,7 @@ For every visible widget, fill all 6 fields:
 - **cadence**:         <expected refresh interval — e.g. "every 60s", "on-demand from user expand", "live stream">
 - **failure modes**:   <what "no data" / "stale data" / "wrong data" looks like for this widget specifically>
 - **mitigation tier**: <1 = consumer-side staleness check (latestSignalWins) | 2 = producer-side cleanup | 3 = registry-as-truth (_status_registry.json)>
+- **health rule**:     <per-indicator green/yellow/red logic — what does "1 finding" MEAN for this widget? See §2.5 below>
 ```
 
 Plus mandatory citation:
@@ -44,6 +45,24 @@ Plus mandatory citation:
 - **Consumer cited**: `[cited file:line]` of the SwiftUI view's read site
 
 If the producer is external (third-party API, SSH state from another host), cite the call site that fetches it + an `[unverified-external]` tag.
+
+## §2.5. Per-indicator health rule (HARD RULE — learned 2026-04-27)
+
+> **Each indicator declares its own meaning of GREEN/YELLOW/RED. Generic count-bucketing across heterogeneous indicators is forbidden.** What `count=1` means in `graph_filesystem_drift` (instant RED — graph claims phantom file = broken state) is NOT what `count=1` means in `orphan_sweep` (one untouched todo, not a fire).
+
+When a widget renders a health-dot or color-coded state, the spec MUST declare which CLASS of rule applies + the specific thresholds:
+
+| Class | When | Pattern |
+|---|---|---|
+| **Boolean / severity-binary** | Any non-info finding = bug. Examples: config_wiki_drift (intent ≠ live), graph_filesystem_drift (PHANTOM_IN_GRAPH) | `>=1 critical → RED`, else `GREEN`. No yellow. |
+| **Severity-tiered** | Findings carry severity field (`info`/`warn`/`error`/`critical`). Examples: wiring_drift, content_schema_drift | `>=1 critical → RED`, `>=1 warn/error → YELLOW`, info-only → `GREEN` |
+| **Verdict-counted** | Findings carry verdict (`green`/`yellow`/`red`). Volume of `red` matters. Example: utilization_drift | `>=N reds → RED`, `>=1 red → YELLOW`, all yellow → `GREEN` |
+| **Bulk-debt-volumetric** | Volume IS the signal (true count-based). Example: orphan_sweep_detector backlog | `>200 actionable → RED`, `>50 → YELLOW`, else `GREEN` (thresholds per-widget) |
+| **Aggregate-OR (parent)** | Parent rolls up children. Example: OverallHealthPill | `any child RED → parent RED`, `any child YELLOW → parent YELLOW`, else `GREEN`. NO count-bucketing across heterogeneous children. |
+
+Source: vibe-island consistency-daemons panel shipped with generic `count<=10 → yellow, count>10 → red` for 7 heterogeneous detectors. graph_filesystem_drift = 11,444 RED was misleading (only 1 was a real PHANTOM, 11,443 were `ORPHAN_ON_DISK` info-noise). config_wiki_drift = 4 AMBER hid 1 actual critical kalshi-bot intent-drift behind the "≤10 = yellow" rule. Per-detector rules unmasked both. See `~/vibe-island/Sources/VibeIsland/Models/DaemonFindings.swift` `healthForDetector()` for the canonical impl.
+
+Iron law: **the spec is rejected if any indicator's health-rule field reads `generic count-bucketing` or `same as default`.** Each widget's rule must cite its CLASS + the concrete threshold, with a 1-line "what does N findings MEAN" justification.
 
 ## §3. Mitigation-tier decision rules
 

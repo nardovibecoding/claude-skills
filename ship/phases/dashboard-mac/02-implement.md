@@ -99,6 +99,61 @@ If `/frontendtest` flags a snapshot failure, do NOT re-baseline here. Snapshot r
 7. **Rollback point tagged** — `git tag ship-<feature>-slice-N`
 8. **Rule 8 audit trigger** — if 3rd+ change to same file, full audit of interacting parts before proceeding
 
+## §5.5. Per-indicator health rule (HARD RULE — learned 2026-04-27)
+
+> **Generic count-bucketing across heterogeneous indicators is forbidden.** Each indicator/detector/widget that renders a health-dot or color-coded state implements its OWN health function based on its finding semantics — declared in Phase 01 §2.5.
+
+Forbidden patterns in code:
+
+```swift
+// ❌ NEVER ship this — generic count-bucket hides per-detector meaning
+private static func healthDot(count: Int, lastRun: Date?) -> HealthDot {
+    if count == 0 { return .green }
+    if count <= 10 { return .yellow }
+    return .red
+}
+```
+
+```swift
+// ❌ Same bug, inline form
+let status = count > 50 ? .red : count > 10 ? .yellow : .green
+```
+
+Required pattern: per-detector switch + named function:
+
+```swift
+private static func healthForDetector(key: String, findings: [[String: Any]], lastRun: Date?) -> HealthDot {
+    if isStale(lastRun) { return .red }
+    switch key {
+    case "config_wiki_drift":
+        return findings.contains { ($0["severity"] as? String) == "critical" } ? .red : .green
+    case "graph_filesystem_drift":
+        return findings.isEmpty ? .green : .red    // upstream filter already removed info-noise
+    case "wiring_drift", "content_schema_drift":
+        // severity-tiered
+        if hasSeverity(findings, "critical") { return .red }
+        if hasSeverity(findings, "warn") || hasSeverity(findings, "error") { return .yellow }
+        return .green
+    case "utilization_drift":
+        // verdict-counted
+        let reds = countVerdict(findings, "red")
+        if reds >= 5 { return .red }
+        if reds >= 1 { return .yellow }
+        return .green
+    case "orphan_sweep_detector":
+        // bulk-debt-volumetric
+        return findings.count > 200 ? .red : findings.count > 50 ? .yellow : .green
+    default:
+        // unknown detector — conservative count-fallback. NEVER make this the primary path.
+        return findings.isEmpty ? .green : .yellow
+    }
+}
+```
+
+Phase 4 self-audit (mandatory before close): grep the diff for `count <= ` / `count > 10` / `count > 50` style bucketing. Any hit that is NOT inside a per-class bucket (volumetric only, with a 1-line comment justifying volume = signal) is rejected.
+
+Reference impl: `~/vibe-island/Sources/VibeIsland/Models/DaemonFindings.swift` `healthForDetector()` + `healthForOrphanSweep()`.
+
 ## §6. Concurrency hygiene
 
 - `@MainActor` on view-mutating types (`@StateObject` classes that publish to views).
