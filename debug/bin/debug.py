@@ -743,14 +743,43 @@ fresh evidence: n/a
 # /debug drift — mode 4 (S8)
 # ---------------------------------------------------------------------------
 
+# Bare boolean flags allowed in `--<name>` form (no `=`). Anything else
+# arriving as bare `--unknown` raises a clear error so silent typos like
+# `--dry_run` (S6 root cause) cannot fall through to a real production write.
+_BOOL_FLAG_ALLOWLIST = {"dry_run", "verbose", "force"}
+
+
 def _parse_kv_args(argv: list[str], known_flags: dict) -> tuple[dict, list[str]]:
-    """Return (flags, positional). known_flags maps name -> default."""
+    """Return (flags, positional). known_flags maps name -> default.
+
+    Accepts:
+      --dry-run / --dry_run       → flags["dry_run"] = True   (allowlisted bool)
+      --verbose / --force         → flags[name] = True        (allowlisted bool)
+      --baseline=VAL              → flags["baseline"] = VAL
+      --runs=N                    → flags["runs"] = int(N)
+      --bug-slug=VAL              → flags["bug_slug"] = VAL
+      --host=VAL / --<key>=VAL    → flags[normalized_key] = VAL (passthrough)
+      bare --unknown_flag         → raises ValueError (no silent allow)
+    """
     flags = dict(known_flags)
     positional = []
     for a in argv:
-        if a == "--dry-run":
-            flags["dry_run"] = True
-        elif a.startswith("--baseline="):
+        # Bare-flag form: --<name>  (no `=`)
+        if a.startswith("--") and "=" not in a:
+            name = a[2:].replace("-", "_")
+            if not name:
+                positional.append(a)
+                continue
+            if name in _BOOL_FLAG_ALLOWLIST:
+                flags[name] = True
+                continue
+            raise ValueError(
+                f"unknown flag {a!r}: bare --flag form only supports "
+                f"{sorted(_BOOL_FLAG_ALLOWLIST)} (use --key=value for others)"
+            )
+
+        # Key=value form
+        if a.startswith("--baseline="):
             flags["baseline"] = a.split("=", 1)[1]
         elif a.startswith("--runs="):
             try:
@@ -759,6 +788,11 @@ def _parse_kv_args(argv: list[str], known_flags: dict) -> tuple[dict, list[str]]
                 flags["runs"] = 10
         elif a.startswith("--bug-slug="):
             flags["bug_slug"] = a.split("=", 1)[1]
+        elif a.startswith("--") and "=" in a:
+            # Generic --key=value passthrough (e.g. --host=mac). Normalise
+            # dashes to underscores for the flags dict key.
+            key, val = a.split("=", 1)
+            flags[key[2:].replace("-", "_")] = val
         else:
             positional.append(a)
     return flags, positional
@@ -1444,43 +1478,12 @@ _DRIFT_REPO_BY_HOST = {
 }
 
 
-# S1: Auto-detector allowlist + stubs for cmd_scan (daemon-mode dispatch).
-# bug/flaky/race require symptom strings — NEVER auto-fire (panel noise).
-_AUTO_DETECTORS = {
-    "wiring_recheck",
-    "drift_recheck",
-    "wedge_recheck",
-    "leak_recheck",
-    "performance_recheck",
-}
-
-
-def _check_auto_detector_allowed(name: str) -> None:
-    """Raise if a caller tries to auto-fire a non-allowlisted detector
-    (bug/flaky/race need symptom strings — manual-only)."""
-    if name not in _AUTO_DETECTORS:
-        raise RuntimeError(
-            f"manual-mode auto-fire forbidden — {name} not in "
-            f"_AUTO_DETECTORS allowlist"
-        )
-
-
-def _wedge_recheck(host: str) -> list[dict]:
-    """Scheduled re-run of /debug wedge on bot units. Stub in S1; logic in S3."""
-    _check_auto_detector_allowed("wedge_recheck")
-    return []
-
-
-def _leak_recheck(host: str) -> list[dict]:
-    """Scheduled re-run of /debug leak on RSS-history candidates. Stub in S1; logic in S4."""
-    _check_auto_detector_allowed("leak_recheck")
-    return []
-
-
-def _performance_recheck(host: str) -> list[dict]:
-    """Scheduled re-run of /debug performance on hot-process candidates. Stub in S1; logic in S5."""
-    _check_auto_detector_allowed("performance_recheck")
-    return []
+# S1: Auto-detector allowlist for cmd_scan daemon-mode dispatch.
+# Per CLAUDE.md "Rule-based > LLM for local classifiers" HARD RULE: only modes
+# expressible as deterministic rules auto-fire. bug/flaky/race need symptom
+# strings + interactive reproduction → NEVER auto-fire (panel noise risk).
+# wedge/leak/performance scaffolding deferred to future ships (S3-S5).
+_AUTO_DETECTORS = {"wiring", "drift"}
 
 
 def _drift_recheck(host: str) -> list[dict]:
@@ -1582,7 +1585,11 @@ def cmd_scan(argv: list[str]) -> int:
     """Autonomous daemon-mode scan: re-verify all status==open ledger entries,
     write daemon_summary to ~/inbox/_summaries/pending/<DATE>/debug_<host>.json.
     Read-only: does NOT mutate the ledger."""
-    flags, _ = _parse_kv_args(argv, {"dry_run": False})
+    try:
+        flags, _ = _parse_kv_args(argv, {"dry_run": False})
+    except ValueError as e:
+        print(f"[debug scan] {e}", file=sys.stderr)
+        return 2
 
     # Lazy import bigd_common — path differs across hosts:
     #   Mac:    ~/NardoWorld/scripts/bigd/_lib/
@@ -1603,6 +1610,23 @@ def cmd_scan(argv: list[str]) -> int:
     host = _detect_host()
     t0 = time.time()
     cron_fired = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # KILLSWITCH guard — mirror sibling daemon pattern from
+    # ~/NardoWorld/scripts/bigd/lint/daemon.py:52,394-397. When the file exists,
+    # write a green heartbeat and exit immediately (no detectors run).
+    KILLSWITCH = HOME / "NardoWorld" / "meta" / "big_systemd" / "KILLSWITCH"
+    if KILLSWITCH.exists():
+        try:
+            _write_heartbeat(
+                daemon="bigd-debug", host=host,
+                cycle_status="ok", cycle_seconds=0.0,
+                findings_filed=0, errors=["KILLSWITCH active"],
+            )
+        except Exception as e:
+            print(f"[debug scan] heartbeat write failed under KILLSWITCH: {e}",
+                  file=sys.stderr)
+        print(f"[debug scan] KILLSWITCH active at {KILLSWITCH} — exit 0")
+        return 0
 
     all_entries = _parse_ledger_entries()
     open_entries = [e for e in all_entries if e.get("status", "") == "open"]
@@ -1626,24 +1650,29 @@ def cmd_scan(argv: list[str]) -> int:
 
     rot_count = sum(1 for e in open_entries if _entry_age_days(e) > 7)
 
-    # S1: dispatch the auto-allowlisted rechecks beyond wiring (which ran above
-    # via _recheck_entry). drift_recheck is real (S2 shipped); wedge/leak/perf
-    # are stubs returning [] until S3-S5. _check_auto_detector_allowed gates
-    # any name passed here.
-    proposed_actions: list[dict] = []
+    # S1+S2: dispatch auto-allowlisted detectors. _AUTO_DETECTORS gates which
+    # ledger entry modes auto-fire (rule-based only; bug/flaky/race forbidden
+    # per CLAUDE.md "Rule-based > LLM"). Wedge/leak/performance scaffolding
+    # deferred to future ships (S3-S5). Fail-closed: detector exception → log,
+    # append to known_gaps, no proposed_action emitted.
+    proposed: list[dict] = []
     detectors_run = ["wiring_recheck"]
-    for det_name, det_fn in (
-        ("drift_recheck", _drift_recheck),
-        ("wedge_recheck", _wedge_recheck),
-        ("leak_recheck", _leak_recheck),
-        ("performance_recheck", _performance_recheck),
-    ):
-        _check_auto_detector_allowed(det_name)
+    drift_gap = ""
+    if "drift" in _AUTO_DETECTORS:
         try:
-            proposed_actions.extend(det_fn(host))
-            detectors_run.append(det_name)
+            proposed.extend(_drift_recheck(host))
+            detectors_run.append("drift_recheck")
         except Exception as exc:
-            print(f"[debug scan] {det_name} failed: {exc}", file=sys.stderr)
+            drift_gap = f"; drift:{exc}"
+            print(f"[debug scan] drift_recheck failed: {exc}", file=sys.stderr)
+
+    # Roll up severity from new proposed actions into the existing rollup.
+    # Schema severities are lowercase; proposed_action `risk` field is uppercase.
+    _risk_to_sev = {"CRITICAL": "critical", "HIGH": "high",
+                    "MEDIUM": "medium", "LOW": "low"}
+    for pa in proposed:
+        sev = _risk_to_sev.get(pa.get("risk", "LOW").upper(), "low")
+        sev_count[sev] = sev_count.get(sev, 0) + 1
 
     duration = round(time.time() - t0, 3)
     cron_completed = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1673,8 +1702,8 @@ def cmd_scan(argv: list[str]) -> int:
                 "detectors_failed": 0,
             },
             "land": {
-                "findings_total": len(open_entries),
-                "findings_new": 0,
+                "findings_total": len(open_entries) + len(proposed),
+                "findings_new": len(proposed),
                 "findings_recurring": len(recurring_ids),
                 "findings_resolved_since_last": len(resolved_ids),
                 "findings_regressed": 0,
@@ -1683,14 +1712,16 @@ def cmd_scan(argv: list[str]) -> int:
             "monitor": {
                 "last_run_findings_addressed": f"{len(resolved_ids)}/{len(open_entries)}",
                 "rot_count": str(rot_count),
-                "feedback_to_next_spec": "interactive recheck still needed for drift/flaky/performance/bug modes",
+                "feedback_to_next_spec": "wedge/leak/performance auto-rechecks deferred to S3-S5; flaky/bug/race remain manual-only",
             },
         },
-        "proposed_actions": proposed_actions,
+        "proposed_actions": proposed,
         "self_report": {
             "daemon_health": "green" if duration < 30 else "yellow",
-            "confidence_in_findings": "Rule-based recheck with no LLM; high confidence on wiring verdicts. Other modes deferred to interactive recheck.",
-            "known_gaps": "drift/flaky/performance/bug recheck not yet automated; orphan/zombie via consistency-daemon S5",
+            "confidence_in_findings": "Rule-based recheck with no LLM; high confidence on wiring + drift verdicts. Other modes deferred.",
+            "known_gaps": ("wedge/leak/performance recheck not yet automated (S3-S5); "
+                          "flaky/bug/race remain manual-only per Rule-based>LLM"
+                          + drift_gap),
         },
         "finding_lifecycle": {
             "new_ids": [],
@@ -1714,13 +1745,13 @@ def cmd_scan(argv: list[str]) -> int:
             host=host,
             cycle_status="ok",
             cycle_seconds=duration,
-            findings_filed=len(open_entries),
+            findings_filed=len(open_entries) + len(proposed),
             errors=[],
         )
     except Exception as e:
         # Heartbeat write must never fail the daemon — log and continue.
         print(f"[debug scan] heartbeat write failed: {e}", file=sys.stderr)
-    print(f"[debug scan] wrote {out} | open={len(open_entries)} resolved={len(resolved_ids)} rot={rot_count} duration={duration}s")
+    print(f"[debug scan] wrote {out} | open={len(open_entries)} drift={len(proposed)} resolved={len(resolved_ids)} rot={rot_count} duration={duration}s")
     return 0
 
 

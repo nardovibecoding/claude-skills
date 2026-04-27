@@ -121,29 +121,13 @@ Flaky mode — intermittent (race / state-dependent). Reuses 17-step engine with
 ### `/debug performance <feature>`
 Performance mode — fires correctly but slow / hot loop / leak. All 17 steps active; baseline metrics captured per `~/.claude/skills/ship/phases/bot/04-land.md` step 7. Loads `phases/performance.md`. Verdict: `within-budget | regression | leak | hot-loop | inconclusive`. Flags: `--baseline=<file>`, `--dry-run`.
 
-### `/debug scan` (daemon mode — wedge integration SPEC for v2)
+### `/debug scan` (daemon mode)
 
-Currently `cmd_scan` (called by `bigd run_parallel.sh` line 62 as `python3 ~/.claude/skills/debug/bin/debug.py scan`) only re-verifies open ledger entries via `wiring_recheck`.
+Daemon scope (cmd_scan) — runs allowlisted rule-based modes only: wiring/drift live; wedge/leak/performance shipping in S3-S5. Bug/flaky/race NEVER auto-fire (manual symptom required).
 
-**v2 SPEC — extend cmd_scan with wedge sweep** (next session):
+Canonical allowlist: `_AUTO_DETECTORS` constant in `bin/debug.py`. Full SPEC at `~/.ship/debug-daemon/goals/01-spec.md` (+ `02-plan.md`).
 
-1. Add `wedge_targets.json` config at `~/.claude/skills/debug/wedge_targets.json` listing units to wedge-probe per host:
-   ```json
-   {
-     "hel":    ["kalshi-bot.service", "bigd-parallel.timer"],
-     "london": ["pm-bot.service", "watchdog-pm-bot.timer"],
-     "mac":    []
-   }
-   ```
-2. cmd_scan reads wedge_targets for current host, runs `bin/wedge-capture.sh --capture-only` against each (~5s budget per unit, 30s total cap).
-3. Captures D-state + log-rate-zero candidates → adds `wedge_findings` array to daemon_summary's `ship_phases.land`.
-4. Each wedge finding becomes a `proposed_action` in the bundle: "investigate <unit> in /proc/PID/wchan = <symbol>".
-
-**Realization Checks for daemon-mode wedge:**
-- RC-5 (cross-host smoke) applies — if wedge_targets covers Hel + London, both must be reachable via SSH at scan time, else verdict degrades to `partial`.
-- RC-1 (stub markers) NOT applicable to daemon-mode (no changeset).
-
-Implementation deferred: needs careful budget management (5s × N units must not push parallel-fire window past collector's grace_min). Track in `~/.ship/debug-wedge-daemon/01-spec.md` (TODO next session).
+Flags: `--dry_run` (print summary to stdout, no inbox write), `--verbose`, `--force`. Bare `--<unknown>` raises a clear error (no silent allow).
 
 ### `/debug wedge <unit>`
 Wedge mode — process appears alive (`systemctl is-active = active`) but JS / userspace stops executing. Log rate drops to 0. SIGTERM hangs 90s+ → SIGKILL. Process state in `/proc/PID/status` is `D` (uninterruptible sleep). Loads `phases/wedge.md`.
