@@ -20,6 +20,17 @@ Runs a structured audit of ~/.claude/skills/ and reports issues by severity.
 3. **Stub-only skills** -- SKILL.md under 200 bytes (just a skill-loader stub pointing nowhere valid)
 4. **Orphan refs in skill-router** -- skill names in skill-router SKILL.md profiles that no longer exist as dirs
 5. **Orphan refs in settings.json** -- hook commands pointing to files that no longer exist
+6. **Inline-bloat skills** (lazy-load discipline) -- SKILL.md ≥200 lines AND zero sibling content (no `references/` dir, no `scripts/` dir, no readable `*.md` peers, no `Read .*\.md` / `references/` patterns inside). These load their full body on every invocation and should be split.
+
+## Lazy-load heuristic (HARD RULE — don't repeat the bigd/legends miscall)
+
+Line count alone is NOT the signal. A 700-line SKILL.md can be perfectly lazy if it dispatches to sibling files; a 250-line SKILL.md can be fully inline if it has no siblings.
+
+Audit order:
+1. `ls <skill-dir>` — does it have siblings (`references/`, `scripts/`, `*.md` peers, `*.yaml` data files)?
+2. `grep -E 'Read |references/|@.*\.md|phases/|<dir>/<file>\.md' SKILL.md` — does the body read sibling content on-demand?
+3. **Inline-bloat verdict** = (≥200 lines) AND (zero siblings) AND (zero on-demand reads). All three must hold. Two-of-three = borderline, flag but don't auto-recommend.
+4. Skills whose SKILL.md content IS the skill (small dispatchers, e.g. `chatid`, `system-check`) are exempt regardless of line count.
 
 ## Output Format
 
