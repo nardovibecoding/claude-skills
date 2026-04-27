@@ -1,13 +1,20 @@
 ---
 name: ship
 description: |
-  Full 5-phase build+ship ritual. Auto-routes bot vs app based on target. Each phase maps to a strict-* agent. Embeds SPREAD/SHRINK at every phase close.
+  Full build+ship ritual. Auto-routes BOT vs APP vs DASHBOARD-MAC based on target. Each phase maps to a strict-* agent. Embeds SPREAD/SHRINK at every phase close.
 
   BOT keywords (route to phases/bot/): dagou, kalshi, polymarket, pm-bot, london, hel, admin-bot, telegram-bot, xhs-mcp, douyin-mcp, legends, hooks, MCP servers, any internal tool.
 
   APP keywords (route to phases/app/): user-facing, public, launch, landing, UI, B2C, customers, tokengotchi, external-facing.
 
-  Triggers: "ship X", "build X", "create X", "implement X", "integrate X", "audit X", "continue X". Ambiguous → ask "bot/internal or user-facing app?"
+  DASHBOARD-MAC keywords (route to phases/dashboard-mac/, SwiftUI macOS only): vibe-island, dashboard, panel, island, pill, notch, swiftui, .app bundle, snapshot test, lineage tab, daemon health panel, status registry, "live status", "stale lights", "tab swap", "expand pill", AppDelegate.
+
+  Routing keyword priority:
+  - Explicit project-name keywords (vibe-island, kalshi-bot, pm-london) trump service-name keywords (kalshi, polymarket).
+  - Within same priority tier, last meaningful keyword wins.
+  - No match → run 3-test ladder, do NOT default-route.
+
+  Triggers: "ship X", "build X", "create X", "implement X", "integrate X", "audit X", "continue X". Ambiguous → run 3-test ladder: (1) Audience — Bernard alone → DASHBOARD-MAC, other bots → BOT, public → APP. (2) Artifact — `.app`+plist → DASHBOARD-MAC, systemd service → BOT, web/store → APP. (3) Tie-breaker — ask Bernard.
 
   MODES: new (default) / audit / continue / big-systemd.
 
@@ -78,7 +85,7 @@ Take top-5 matches across all five sources. Inject as **PRIOR ART** section at t
 ## Phase flow (lazy-load)
 
 For each phase N:
-1. Read `~/.claude/skills/ship/phases/<bot|app>/0N-<phase>.md`
+1. Read `~/.claude/skills/ship/phases/<bot|app|dashboard-mac>/0N-<phase>.md` (dashboard-mac uses 00-07 numbering; bot/app use 01-05)
 2. **Identify owning strict-* agent** per Phase Agent Map below
 3. Execute phase per loaded instructions — use owning agent's brief template
 4. **SPREAD/SHRINK pass** before closing phase (L1-L5 + Sh1-Sh5 checklist)
@@ -241,7 +248,16 @@ Rule of thumb: use when ≥3 files touched OR multi-day OR touches production da
 
 ## Routing disambiguation
 
-If unclear whether bot or app, ask once:
-> "Routing to /ship — is this internal/bot tooling or user-facing product?"
+If unclear which of bot / app / dashboard-mac, run the 3-test ladder:
 
-If user specifies mixed (e.g. "bot dashboard for users"), default to **bot** variant and flag the UI portion for app-variant Phase 3 accessibility/mobile checks.
+1. **Audience** — Bernard alone → `dashboard-mac`. Other bots → `bot`. Public → `app`.
+2. **Artifact** — `.app` bundle + LaunchAgent plist → `dashboard-mac`. systemd service / Python daemon → `bot`. Web bundle / DMG / mobile binary → `app`.
+3. **Tie-breaker** — ask Bernard.
+
+Disambiguation rules when keywords overlap (per `~/.ship/dashboard-ship-route/goals/00-spec.md` §2.3):
+
+- **Daemon-health display panel** whose artifact is a `.app` tab → `dashboard-mac`, regardless of data source's BOT keywords. The display layer is the artifact; the data layer is upstream.
+- **A new bot daemon that also writes a heartbeat the dashboard reads** → `bot` (the daemon is the artifact; dashboard read is incidental).
+- **A change that touches both** (plist + .app + Swift code) → `bot` for the daemon + `dashboard-mac` for the display tab as **two separate /ship runs**, each with its own slug.
+
+Mixed phrasing (e.g. "bot dashboard for users") → public-user audience disqualifies `dashboard-mac` (audience-of-one only); fall through to bot vs app per audience test, default `bot` and flag UI for app-variant accessibility checks.
