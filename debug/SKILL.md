@@ -11,7 +11,8 @@ description: |
     /debug bug "<symptom>"          — Bug mode (A: symptom-first → root cause). 17-step engine. "X is wrong / broken"
     /debug drift <feature>          — Drift mode. "X used to work, now stale"; flags --baseline=<sha-or-iso> --dry-run
     /debug flaky "<symptom>"        — Flaky mode (loop reproducer, race priors). "X sometimes fails"; flags --runs=N --dry-run
-    /debug performance <feature>    — Performance mode (latency / leak / hot-loop). "X is slow / hot"; flags --baseline=<file>
+    /debug performance <feature>    — Performance mode (latency / hot-loop / CPU). "X is slow / hot"; flags --baseline=<file>
+    /debug leak <feature>           — Leak mode (RSS climb / OOM / heap). "X is leaking / OOM / RSS climb / heap exhausted / memory bloat"; flags --baseline=<file>
     /debug race <feature>           — Race mode (producer-consumer schedule mismatch). "X fires but Y is empty"; flags --check-systemd-on=<host>
     /debug list                     — show realize-debt.md ledger
 
@@ -53,7 +54,8 @@ Source: obra/superpowers (MIT). Both laws apply to all /debug modes; full enforc
 | "X is wrong" / "X is broken" / "X is crashing" / "why isn't X" | Bug (Group A) | `phases/bug.md` |
 | `/debug bug "<symptom>"` | Bug (Group A) | `phases/bug.md` |
 | `/debug list` | (read-only ledger view) | inline below |
-| "X is slow / hot / leaking" | Performance (Group A) | `phases/performance.md` |
+| "X is slow / hot / high CPU / event-loop lag" | Performance (Group A) | `phases/performance.md` |
+| "X is leaking / OOM / RSS climb / heap exhausted / memory bloat" | Leak (Group A) | `phases/leak.md` |
 | "X used to work, now stale" | Drift (Group A) | `phases/drift.md` |
 | "X is flaky / sometimes fails" | Flaky (Group A) | `phases/flaky.md` |
 | (daemon-driven, no phrase) | Orphan / Zombie (Group C) | consistency-daemon detector (S5) |
