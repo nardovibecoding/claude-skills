@@ -1433,6 +1433,90 @@ def cmd_scan(argv: list[str]) -> int:
     return 0
 
 
+def cmd_wedge(argv: list[str]) -> int:
+    """
+    Wedge mode — process appears alive (systemctl is-active = active) but JS /
+    userspace stops executing, log rate=0, SIGTERM hangs 90s+. Process state
+    in /proc/PID/status is D (uninterruptible sleep).
+
+    Born from Apr 27 2026 pm-london investigation: bot wedged every 25min in
+    mem_cgroup_handle_over_high. Root cause = MemoryHigh=1400M soft-throttle.
+    Fix = raise MemoryHigh to MemoryMax. See phases/wedge.md §A.
+
+    This verb does NOT execute the trace itself (the trace runs on a remote
+    host as the service user). It emits the arming command + post-wedge read
+    instructions + verdict mapping per wchan.
+    """
+    if not argv:
+        print("usage: debug.py wedge <unit> [--capture-only] [--read-trace=<file>] "
+              "[--host=<ssh-alias>]", file=sys.stderr)
+        return 2
+    unit = argv[0]
+    flags = [a for a in argv[1:] if a.startswith("--")]
+    capture_only = "--capture-only" in flags
+    read_trace = next((f.split("=", 1)[1] for f in flags if f.startswith("--read-trace=")), None)
+    host = next((f.split("=", 1)[1] for f in flags if f.startswith("--host=")), None)
+
+    print(f"# /debug wedge — {unit}{' @ ' + host if host else ''}")
+    print()
+    print("## Iron Laws")
+    print("1. NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST")
+    print("2. NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE")
+    print()
+    print("Phase file: ~/.claude/skills/debug/phases/wedge.md (read for full 17-step engine)")
+    print()
+
+    capture_script = Path.home() / ".claude" / "skills" / "debug" / "bin" / "wedge-capture.sh"
+    if not capture_script.exists():
+        print(f"PREMISE_FAILURE: capture script missing at {capture_script}", file=sys.stderr)
+        return 2
+
+    if read_trace:
+        print(f"## Step 0.5 (read existing trace) — {read_trace}")
+        print()
+        print("Run on the host that owns the trace file:")
+        print(f"  sed -n '/=== DEEP CAPTURE/,/=== END DEEP CAPTURE/p' {read_trace}")
+        print()
+        print("Then map the main thread wchan to a remediation route per phases/wedge.md §A-§E.")
+        return 0
+
+    print("## Step 0.5 KERNEL-CAPTURE — arm trace BEFORE next wedge cycle")
+    print()
+    print(f"On the host running {unit}:")
+    print(f"  scp {capture_script} <host>:/tmp/")
+    print(f"  ssh <host> \"nohup bash /tmp/wedge-capture.sh {unit} >/dev/null 2>&1 & disown\"")
+    print()
+    print("Trace polls every 30s for 25 min. On first state=D entry, dumps DEEP CAPTURE")
+    print("with main wchan + per-thread state + wchan histogram + open fds + I/O counters.")
+    print("Output: /tmp/wedge-trace-<PID>.log on the remote host.")
+    print()
+
+    if capture_only:
+        print("(--capture-only: exiting after arming. Re-invoke with --read-trace=<file> after wedge.)")
+        return 0
+
+    print("## After wedge fires (20-30 min later), read DEEP CAPTURE:")
+    print(f"  ssh <host> \"sed -n '/=== DEEP CAPTURE/,/=== END DEEP CAPTURE/p' /tmp/wedge-trace-*.log\"")
+    print()
+    print("## wchan → remediation route (per phases/wedge.md §A-§E)")
+    print()
+    print("| wchan | route | first action |")
+    print("|---|---|---|")
+    print("| mem_cgroup_handle_over_high | §A cgroup soft-throttle | raise MemoryHigh to match MemoryMax |")
+    print("| folio_wait_bit / wait_on_page_bit | §B disk I/O block | iostat / check failing block device |")
+    print("| sk_wait_data / tcp_recvmsg | §C network read block | enable SO_KEEPALIVE on long-lived sockets |")
+    print("| futex_wait_queue (main thread) | §D userspace deadlock | flame graph / libuv pool audit |")
+    print("| pipe_read / do_wait | §E subprocess hang | audit subprocess timeout handling |")
+    print()
+    print("## Verdict (after fix + 1.5x cycle re-trace)")
+    print("- wedge_eliminated: PID stable past prior wedge moment, wchan never re-enters target function")
+    print("- wedge_persists: same wchan re-fires; fix incomplete (raise threshold further or wrong target)")
+    print("- wedge_shifted_to_<wchan>: secondary mechanism; restart investigation from Step 3")
+    print()
+    print("Ledger entry written to ~/NardoWorld/realize-debt.md with mode=wedge after verification.")
+    return 0
+
+
 def cmd_race(argv: list[str]) -> int:
     """
     Race-condition mode — producer-consumer schedule mismatch detector.
@@ -1574,6 +1658,8 @@ def main(argv: list[str]) -> int:
         return cmd_performance(argv[2:])
     if verb == "race":
         return cmd_race(argv[2:])
+    if verb == "wedge":
+        return cmd_wedge(argv[2:])
     if verb == "scan":
         return cmd_scan(argv[2:])
     print(f"unknown verb: {verb}", file=sys.stderr)

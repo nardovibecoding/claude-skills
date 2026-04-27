@@ -1,0 +1,163 @@
+# Realization Checks — universal Phase 4 LAND additions
+
+Loaded by every `phases/<route>/04-land.md`. These checks run BEFORE the route-specific verdict gate (`/debug check` for bot, skill-invocation for skill, etc).
+
+Iron Law: build passing is the LOWEST bar. Every check below must produce evidence, not just exit 0.
+
+---
+
+## RC-1 — Universal stub-marker scan (T1.3)
+
+For ANY shipped artifact (bot, app, skill, hook, doc, mcp, dashboard-mac), grep the changeset for stub markers. Any hit BLOCKS phase close.
+
+```bash
+# In the repo root (or staging dir):
+git diff <base>..HEAD --name-only | xargs grep -nE \
+    '\[stub\]|TODO[: ]|FIXME[: ]|skeleton|NotImplementedError|raise NotImplemented|# stub|# placeholder|step [0-9]+: <[a-z]+>' 2>/dev/null
+```
+
+Block list (any match REFUSES close):
+- `[stub]` / `# stub` / `// stub`
+- `TODO:` / `FIXME:` (in code, not in docs/comments declaring future work)
+- `skeleton` / `placeholder` / `not implemented`
+- `raise NotImplementedError` / `pass  # implement later`
+- `step N: <name>` placeholder pattern (matches `/upskill` v1's failure mode)
+
+Override: `.ship/<slug>/state/04-stub-override.md` with Bernard ack string. Auto-mode CANNOT approve.
+
+---
+
+## RC-2 — SPEC-drift scan (T2.1)
+
+For ANY artifact with a README, SKILL.md, or SPEC file, run a mini ship-auditor on the changeset:
+- Extract claims from the README/SPEC (what the artifact "does")
+- Cite each claim against code (file:line)
+- BLOCK on `SPEC_DRIFT` verdict (claim has no implementation), `RISK` (claim contradicts code)
+- WARN on `MISSING_CITATION` (cannot find evidence either way)
+
+Mini ship-auditor brief:
+```
+Read <artifact>/README.md (or SKILL.md). Extract numbered claims.
+For each claim, cite file:line that implements it. If absent → SPEC_DRIFT.
+If implementation contradicts → RISK. Otherwise → OK.
+Return verdict (PASS / NEEDS_FIX / REWORK) + top-3 risks.
+```
+
+Cheaper than full ship-auditor: only scans files in `<base>..HEAD` diff + the README/SPEC, not the whole repo.
+
+---
+
+## RC-3 — Idempotency check (T2.2)
+
+For changes that touch installer scripts (`install.sh`, `setup.sh`, `*.plist` template, `package.json` scripts.install):
+
+```bash
+SANDBOX1=$(mktemp -d) && SANDBOX2=$(mktemp -d)
+HOME=$SANDBOX1 bash install.sh > /dev/null 2>&1
+HOME=$SANDBOX1 bash install.sh > /dev/null 2>&1   # 2nd run
+diff -r $SANDBOX1 $SANDBOX2  # any diff = idempotency violation
+```
+
+BLOCK on:
+- 2nd run produces different file content than 1st
+- 2nd run duplicates settings.json entries
+- 2nd run errors out (assumes clean state)
+
+---
+
+## RC-4 — Sync-hook allowlist audit (T2.3)
+
+If the changeset adds or modifies any auto-commit / auto-sync / publish-pipeline script:
+
+```bash
+git diff <base>..HEAD -- '*sync*' '*commit*' '*publish*' | grep -nE 'git add -A|git add \.|git add \-\-all'
+```
+
+BLOCK if any sync hook uses `git add -A`. Required pattern:
+- Allowlist: `git add <each-file-explicitly>`
+- Blocklist guard: scan staged diff for hook-output state files (`.router_log.jsonl`, `.cache/`, etc.) before commit
+- Reference implementation: `~/telegram-claude-bot/scripts/sync_public_repos.py` Step 4 (post-2026-04-27 fix)
+
+Source: 2026-04-27 leak forensics — `git add -A` bypassed the cfg["files"] allowlist and pushed `.router_log.jsonl` (13.6MB session log) + `claude-mcp-proxy/` (private repo mirror) to public repos.
+
+---
+
+## RC-5 — Cross-host smoke (T2.4)
+
+If the changeset names ≥2 hosts (Mac/Hel/London) in code or config, smoke each host's surface:
+
+```bash
+# For each declared host:
+ssh <host> "<smoke command>"   # e.g. systemctl is-active <unit>
+```
+
+BLOCK if any host's smoke fails. Required for PM-bot changes (Hel + London), bigd changes (3-host), shared-state changes (Mac + Hel via bare repo).
+
+---
+
+## RC-6 — Cross-repo cross-link audit (T2.5)
+
+If the changeset is in a public repo with a README, scan the README for `github.com/<user>/<repo>` links and verify each target is PUBLIC at close time:
+
+```bash
+links=$(grep -oE 'github\.com/[^/]+/[^/) ]+' README.md | sort -u)
+for link in $links; do
+    repo=${link#github.com/}
+    vis=$(gh repo view "$repo" --json visibility --jq '.visibility' 2>/dev/null)
+    [ "$vis" = "PRIVATE" ] && echo "BROKEN: README links to private $repo"
+done
+```
+
+BLOCK on any private-target match. Caught manually 2026-04-27 in `memory-wiki-graph-stack` (linked to private `claude-skills`).
+
+---
+
+## RC-7 — Hook-output blocklist (cross-cuts RC-1 + RC-3)
+
+For ANY changeset, scan the working tree for hook-output state files that should never be committed:
+
+```
+.router_log.jsonl | *.router_log.jsonl | **/router_log*.jsonl
+.cache | .cache/ | *.cache
+.session.json | .session/ | *.session.*
+hook_state* | .hook_state.*
+auto_*.log | auto_*.state
+```
+
+BLOCK if any of these are tracked (i.e. `git ls-files | grep <pattern>` returns matches). Source: 2026-04-27 simply-quality-gate leak.
+
+---
+
+## RC-8 — Cross-skill dependency check (T3.4 — stub for now)
+
+When shipping a skill that depends on another skill's output schema, declare the dependency in `~/.claude/skills/<name>/SKILL.md` frontmatter:
+
+```yaml
+depends_on:
+  - skill: extractskill
+    contract: "writes ~/.claude/skills/<imported>/SKILL.md"
+  - skill: github-publish
+    contract: "writes .ship/<slug>/01-spec.md"
+```
+
+Phase 4 reads `depends_on`, runs `/debug check <each>`. If any returns `not_wired`, BLOCK.
+
+v1: declarative only — no runtime graph. v2 (future): build a graph + propagate breakage.
+
+---
+
+## Application order
+
+For each Phase 4 LAND closure:
+
+1. Run RC-1 (stub markers) — fastest, catches most failures
+2. Run RC-7 (hook-output) — fastest, catches privacy regressions
+3. Run RC-2 (SPEC drift) — moderate cost, catches doc lies
+4. Run RC-3 (idempotency) — only if installer-shape change
+5. Run RC-4 (sync-hook) — only if sync-script-shape change
+6. Run RC-5 (cross-host) — only if multi-host change
+7. Run RC-6 (cross-repo links) — only if public-repo README change
+8. Run RC-8 (deps) — only if SKILL with declared deps
+9. Then run route-specific check (`/debug check` for bot, skill-invocation for skill, etc.)
+
+ALL must PASS or have an explicit override before phase close.

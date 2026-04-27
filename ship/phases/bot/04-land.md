@@ -9,6 +9,14 @@ Post-production bookend — discipline gate before declaring done.
 - NEVER include the full §0-§N body in the return message. The file on disk is the source of truth.
 - Phase is not closed until `test -s .ship/<feature>/0N-<phase>.md` passes.
 
+## Universal Realization Checks (run BEFORE bot-specific Steps below)
+
+Load `phases/common/realization-checks.md`. Run RC-1 to RC-7 in declared order. ANY hit BLOCKS phase close (RC-1 stub markers, RC-2 SPEC drift, RC-3 idempotency on installer changes, RC-4 sync-hook allowlist on auto-commit/sync changes, RC-5 cross-host smoke on multi-host changes, RC-6 cross-repo links on public-repo README changes, RC-7 hook-output blocklist).
+
+If any RC fires, the offending file:line + the rule name MUST appear in the artifact's "Realization Check failures" section. Override path per-RC documented in `realization-checks.md`.
+
+---
+
 ## Steps
 
 1. **Strict-plan claims-vs-reality** — subagent audits: "you said X would work. Does it?" File-path citations.

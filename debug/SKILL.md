@@ -1,10 +1,10 @@
 ---
 name: debug
 description: |
-  Unified debug skill — Wiring / Bug / Drift / Flaky / Performance / Zombie / Orphan modes.
+  Unified debug skill — Wiring / Bug / Drift / Flaky / Performance / Leak / Race / Wedge / Zombie / Orphan modes.
   Reads Phase 4 graphs (state_registry / pipeline_graph / data_lineage / sync_graph / consistency_registry) read-only.
   Writes verdicts to ~/NardoWorld/realize-debt.md (the realization-debt ledger; lockfile-protected atomic writes).
-  Shipped: Wiring (S1) + Bug (S3) + Drift/Flaky/Performance (S8) + ledger view.
+  Shipped: Wiring (S1) + Bug (S3) + Drift/Flaky/Performance (S8) + Leak + Race + Wedge (kernel D-state diagnosis, 2026-04-27) + ledger view.
 
   Triggers (verb-first):
     /debug check <feature>          — Wiring mode (B: feature-first → runtime). "is X live", "did we wire X"
@@ -14,6 +14,7 @@ description: |
     /debug performance <feature>    — Performance mode (latency / hot-loop / CPU). "X is slow / hot"; flags --baseline=<file>
     /debug leak <feature>           — Leak mode (RSS climb / OOM / heap). "X is leaking / OOM / RSS climb / heap exhausted / memory bloat"; flags --baseline=<file>
     /debug race <feature>           — Race mode (producer-consumer schedule mismatch). "X fires but Y is empty"; flags --check-systemd-on=<host>
+    /debug wedge <unit>             — Wedge mode (process in kernel D-state, log rate=0, SIGTERM hangs). "X is wedged / frozen in kernel / D-state"; flags --capture-only --read-trace
     /debug list                     — show realize-debt.md ledger
 
   NOT FOR: random fixes (Iron Law forbids), claims without verification (second Iron Law forbids), replacing /ship audit (imports it).
@@ -21,8 +22,10 @@ verified_at: 2026-04-26
 documents:
   - /Users/bernard/.claude/skills/debug/phases/wiring.md
   - /Users/bernard/.claude/skills/debug/phases/bug.md
+  - /Users/bernard/.claude/skills/debug/phases/wedge.md
   - /Users/bernard/.claude/skills/debug/bin/debug.py
   - /Users/bernard/.claude/skills/debug/bin/_disc.py
+  - /Users/bernard/.claude/skills/debug/bin/wedge-capture.sh
   - /Users/bernard/NardoWorld/meta/state_registry.json
   - /Users/bernard/NardoWorld/meta/pipeline_graph.json
   - /Users/bernard/NardoWorld/meta/data_lineage.json
@@ -35,6 +38,29 @@ documents:
 # /debug — unified debug + wiring skill
 
 One mental engine, three entry directions. Subsumes wiring-check, bug-hunting, orphan detection, drift, zombie, performance, flaky modes.
+
+## Realization Checks per verdict (added 2026-04-27 — mirror /ship)
+
+Every `/debug` verb writes a verdict to `~/NardoWorld/realize-debt.md`. Before that write, the verb MUST run the universal Realization Checks from `~/.claude/skills/ship/phases/common/realization-checks.md`:
+
+- **RC-1 (stub markers)** — if the changeset under investigation contains `[stub]`, `TODO:`, `NotImplementedError`, or `step N: <name>` placeholder pattern → degrade verdict to `partial` and tag in ledger as `needs_real_implementation`. Skeleton fixes do NOT count as `wired`.
+- **RC-7 (hook-output blocklist)** — if the changeset commits any `.router_log.jsonl`, `.cache/`, `.session.json`, `hook_state*` → BLOCK verdict close (privacy regression).
+
+For verbs that interact with multi-host or public repos:
+- **RC-5 (cross-host smoke)** — PM bots, bigd: re-verify on Hel + London if both referenced.
+- **RC-6 (cross-repo cross-link audit)** — when /debug runs against a public repo's README claims.
+
+Verbs that interact with installer / sync changes:
+- **RC-3 (idempotency)** — re-run installer in sandbox, assert no diff.
+- **RC-4 (sync-hook allowlist)** — refuse `git add -A` patterns in any sync script.
+
+Verbs operating purely on a live process with no changeset:
+- Skip RC-1/RC-3/RC-4/RC-7 (no diff to scan).
+- RC-5/RC-6 still apply if multi-host / public-repo.
+
+Source: 2026-04-27 — /upskill v1 marked shipped while SOP steps 1-6 were stub echoes. Same failure mode threatens any /debug verb closing on stub-shaped fixes.
+
+---
 
 ## Iron Laws (shared preamble — see `~/.claude/skills/_iron_laws.md`)
 
@@ -58,6 +84,7 @@ Source: obra/superpowers (MIT). Both laws apply to all /debug modes; full enforc
 | "X is leaking / OOM / RSS climb / heap exhausted / memory bloat" | Leak (Group A) | `phases/leak.md` |
 | "X used to work, now stale" | Drift (Group A) | `phases/drift.md` |
 | "X is flaky / sometimes fails" | Flaky (Group A) | `phases/flaky.md` |
+| "X wedged / frozen in kernel / D-state / SIGTERM hangs / process alive but silent" | Wedge (Group A) | `phases/wedge.md` |
 | (daemon-driven, no phrase) | Orphan / Zombie (Group C) | consistency-daemon detector (S5) |
 
 Shipped modes: Wiring (S1) + Bug (S3) + Drift/Flaky/Performance (S8) + ledger view. Zombie / Orphan modes remain daemon-driven (S5 not yet shipped).
@@ -94,6 +121,37 @@ Flaky mode — intermittent (race / state-dependent). Reuses 17-step engine with
 ### `/debug performance <feature>`
 Performance mode — fires correctly but slow / hot loop / leak. All 17 steps active; baseline metrics captured per `~/.claude/skills/ship/phases/bot/04-land.md` step 7. Loads `phases/performance.md`. Verdict: `within-budget | regression | leak | hot-loop | inconclusive`. Flags: `--baseline=<file>`, `--dry-run`.
 
+### `/debug scan` (daemon mode — wedge integration SPEC for v2)
+
+Currently `cmd_scan` (called by `bigd run_parallel.sh` line 62 as `python3 ~/.claude/skills/debug/bin/debug.py scan`) only re-verifies open ledger entries via `wiring_recheck`.
+
+**v2 SPEC — extend cmd_scan with wedge sweep** (next session):
+
+1. Add `wedge_targets.json` config at `~/.claude/skills/debug/wedge_targets.json` listing units to wedge-probe per host:
+   ```json
+   {
+     "hel":    ["kalshi-bot.service", "bigd-parallel.timer"],
+     "london": ["pm-bot.service", "watchdog-pm-bot.timer"],
+     "mac":    []
+   }
+   ```
+2. cmd_scan reads wedge_targets for current host, runs `bin/wedge-capture.sh --capture-only` against each (~5s budget per unit, 30s total cap).
+3. Captures D-state + log-rate-zero candidates → adds `wedge_findings` array to daemon_summary's `ship_phases.land`.
+4. Each wedge finding becomes a `proposed_action` in the bundle: "investigate <unit> in /proc/PID/wchan = <symbol>".
+
+**Realization Checks for daemon-mode wedge:**
+- RC-5 (cross-host smoke) applies — if wedge_targets covers Hel + London, both must be reachable via SSH at scan time, else verdict degrades to `partial`.
+- RC-1 (stub markers) NOT applicable to daemon-mode (no changeset).
+
+Implementation deferred: needs careful budget management (5s × N units must not push parallel-fire window past collector's grace_min). Track in `~/.ship/debug-wedge-daemon/01-spec.md` (TODO next session).
+
+### `/debug wedge <unit>`
+Wedge mode — process appears alive (`systemctl is-active = active`) but JS / userspace stops executing. Log rate drops to 0. SIGTERM hangs 90s+ → SIGKILL. Process state in `/proc/PID/status` is `D` (uninterruptible sleep). Loads `phases/wedge.md`.
+
+Step 0.5 (kernel-capture) arms `bin/wedge-capture.sh` against the live PID — captures `/proc/PID/wchan` + per-thread state + wchan histogram on first D-state entry. The wchan symbol identifies the kernel function the bot is sleeping in (e.g. `mem_cgroup_handle_over_high` = cgroup soft-throttle, `sk_wait_data` = network read blocked).
+
+Verdict: `wedge_eliminated | wedge_persists | wedge_shifted_to_<wchan> | inconclusive`. Flags: `--capture-only` (arm trace and exit, return path to log), `--read-trace=<file>` (skip Step 0.5, parse existing trace).
+
 ### `/debug race <feature>`
 Race-condition mode — feature deploys "successfully" but a producer/consumer schedule mismatch silently drops data. Detected after the bigd 6-daemon ship (Apr 27 2026): bundle assembler ran 4-15s before all daemons finished, capturing 8/18 instead of 18/18. Pure timing race, not a daemon bug.
 
@@ -117,6 +175,7 @@ python3 ~/.claude/skills/debug/bin/debug.py bug "<symptom>"
 python3 ~/.claude/skills/debug/bin/debug.py drift <feature> [--baseline=<sha-or-iso>] [--dry-run]
 python3 ~/.claude/skills/debug/bin/debug.py flaky "<symptom>" [--runs=N] [--dry-run]
 python3 ~/.claude/skills/debug/bin/debug.py performance <feature> [--baseline=<file>] [--dry-run]
+python3 ~/.claude/skills/debug/bin/debug.py wedge <unit> [--capture-only] [--read-trace=<file>]
 python3 ~/.claude/skills/debug/bin/debug.py list
 ```
 

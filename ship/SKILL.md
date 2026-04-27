@@ -1,20 +1,29 @@
 ---
 name: ship
 description: |
-  Full build+ship ritual. Auto-routes BOT vs APP vs DASHBOARD-MAC based on target. Each phase maps to a strict-* agent. Embeds SPREAD/SHRINK at every phase close.
+  Full build+ship ritual. Auto-routes BOT / APP / DASHBOARD-MAC / SKILL / HOOK / DOC / MCP based on target. Each phase maps to a strict-* agent. Embeds SPREAD/SHRINK + universal Realization Checks (RC-1 to RC-8 from `phases/common/realization-checks.md`) at every Phase 4 close.
 
-  BOT keywords (route to phases/bot/): dagou, kalshi, polymarket, pm-bot, london, hel, admin-bot, telegram-bot, xhs-mcp, douyin-mcp, legends, hooks, MCP servers, any internal tool.
+  BOT keywords (route to phases/bot/): dagou, kalshi, polymarket, pm-bot, london, hel, admin-bot, telegram-bot, xhs-mcp, douyin-mcp, legends, any internal tool with a long-running process.
 
   APP keywords (route to phases/app/): user-facing, public, launch, landing, UI, B2C, customers, tokengotchi, external-facing.
 
   DASHBOARD-MAC keywords (route to phases/dashboard-mac/, SwiftUI macOS only): vibe-island, dashboard, panel, island, pill, notch, swiftui, .app bundle, snapshot test, lineage tab, daemon health panel, status registry, "live status", "stale lights", "tab swap", "expand pill", AppDelegate.
 
+  SKILL keywords (route to phases/skill/): "build a skill", "wire up the skill", "ship /<name>", "extend /upskill", any path under `~/.claude/skills/<name>/SKILL.md` or `~/.claude/skills/<name>/scripts/`. Phase 4 invokes the skill via Skill tool + asserts non-stub output + SOP-step coverage. Source - 2026-04-27 /upskill v1 skeleton-shipped failure mode.
+
+  HOOK keywords (route to phases/hook/): "ship a hook", "add hook", "wire hook", any path under `~/.claude/hooks/*.py` (or `.js`/`.sh`). Phase 4 verifies settings.json wiring + test-event firing + pattern compliance per `~/.claude/rules/agents.md`.
+
+  DOC keywords (route to phases/doc/): "ship the lesson", "add atom", "promote the rule", "publish the README", "rewrite CLAUDE.md", any change touching only `*.md` (no code). Phase 4 verifies file exists + linked from at least one index + cross-link integrity.
+
+  MCP keywords (route to phases/mcp/): "ship the MCP server", "wire MCP", any path under `~/.claude/mcp/`, `~/*/mcp/server.py`, or repo with `package.json` declaring `mcp` server. Phase 4 verifies server starts + ListTools probe + test-tool call + mcpServers registration.
+
   Routing keyword priority:
   - Explicit project-name keywords (vibe-island, kalshi-bot, pm-london) trump service-name keywords (kalshi, polymarket).
+  - Path-based matches (`~/.claude/skills/`, `~/.claude/hooks/`, `~/.claude/mcp/`) trump generic keywords ("hook", "skill", "server").
   - Within same priority tier, last meaningful keyword wins.
   - No match → run 3-test ladder, do NOT default-route.
 
-  Triggers: "ship X", "build X", "create X", "implement X", "integrate X", "audit X", "continue X". Ambiguous → run 3-test ladder: (1) Audience — Bernard alone → DASHBOARD-MAC, other bots → BOT, public → APP. (2) Artifact — `.app`+plist → DASHBOARD-MAC, systemd service → BOT, web/store → APP. (3) Tie-breaker — ask Bernard.
+  Triggers: "ship X", "build X", "create X", "implement X", "integrate X", "audit X", "continue X". Ambiguous → run 3-test ladder: (1) Audience — Bernard alone → DASHBOARD-MAC, other bots → BOT, public → APP. (2) Artifact — `~/.claude/skills/` → SKILL, `~/.claude/hooks/` → HOOK, `~/.claude/mcp/` → MCP, `*.md`-only diff → DOC, `.app`+plist → DASHBOARD-MAC, systemd service → BOT, web/store → APP. (3) Tie-breaker — ask Bernard.
 
   MODES: new (default) / audit / continue / big-systemd.
 

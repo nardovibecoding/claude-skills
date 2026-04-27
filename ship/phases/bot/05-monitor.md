@@ -75,9 +75,45 @@ created: <YYYY-MM-DD>
 
 Body: 2-5 paragraphs describing the lesson. Indexed by Phase 0 recall grep (PLUG 1). Each monitor artifact may contain multiple `---`-delimited lesson blocks.
 
+## Time-shifted re-verify (T3.1 + T3.2 — added 2026-04-27)
+
+After the 30/60-min watch window closes, schedule TWO follow-up checks:
+
+### T+24h auto-fire (T3.1)
+
+Schedule a `ScheduleWakeup` (or `CronCreate` for durable) at T+24h with prompt:
+
+```
+/strict-review re-verify <slug> after 24h.
+Check:
+- /debug check <feature> still returns wired
+- ship-log evidence ≤24h old (no silent decay)
+- state_registry process is still ACTIVE (not zombied)
+- no regression alarms tripped overnight
+- no auto-revert / force-push reset
+Append verdict to .ship/<slug>/reports/05-monitor.md as a "T+24h re-verify" section.
+```
+
+This catches features that pass Phase 4 LAND but regress overnight via cron, drift, or downstream change.
+
+### Memory-leak / RSS-climb monitor (T3.2)
+
+For long-running bot/daemon features, before closing 05-monitor, capture an RSS baseline + schedule a `/debug leak <feature>` at T+24h:
+
+```bash
+# Capture baseline at end of 30-min watch
+ssh <host> "ps -o rss= -p \$(systemctl show <unit> -p MainPID --value)" > .ship/<slug>/state/rss-baseline.txt
+```
+
+T+24h `/debug leak` reads this baseline + compares to current RSS. RSS climb >2× baseline OR >500MB → alert.
+
+These two scheduled checks turn Phase 5 from a 30-min snapshot into a true steady-state verification.
+
+---
+
 ## Artifact
 
-`.ship/<slug>/reports/05-monitor.md` (baseline snapshot, tick log, final verdict, YAML lesson blocks)
+`.ship/<slug>/reports/05-monitor.md` (baseline snapshot, tick log, final verdict, YAML lesson blocks, T+24h re-verify section appended on wake)
 
 ---
 
