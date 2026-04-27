@@ -45,6 +45,78 @@ ORPHAN_REGISTRY = META / "orphan_registry.json"  # ships in S5
 HUB_NODES = META / "hub_nodes.json"
 
 VERDICTS = ("wired", "partial", "not_wired", "inconclusive")
+
+# Realization Checks — see ~/.claude/skills/ship/phases/common/realization-checks.md
+RC1_STUB_PATTERNS = (
+    r'\[stub\]', r'#\s*stub\b', r'//\s*stub\b',
+    r'\bTODO[: ]', r'\bFIXME[: ]',
+    r'NotImplementedError', r'raise NotImplemented',
+    r'pass\s*#\s*implement later',
+    r'step \d+:\s*<[a-z_]+>',  # /upskill v1 skeleton fingerprint
+)
+RC7_HOOKOUT_PATTERNS = (
+    r'router_log\.jsonl$', r'\.cache(/|$)', r'\.session\.json$',
+    r'\.session/', r'^hook_state', r'^\.hook_state',
+    r'^auto_.*\.(log|state)$',
+)
+
+
+def _rc_changeset_paths() -> list[Path]:
+    """Returns paths to scan for RC-1 / RC-7. Sources: DEBUG_CHANGESET env (colon-sep)."""
+    raw = os.environ.get("DEBUG_CHANGESET", "").strip()
+    if not raw:
+        return []
+    return [Path(p).expanduser() for p in raw.split(":") if p.strip()]
+
+
+def run_realization_checks(verdict: str, *, mode: str) -> tuple[str, list[str], bool]:
+    """RC-1 (stub markers) + RC-7 (hook-output blocklist) per /debug SKILL.md §Realization Checks.
+
+    Returns (new_verdict, tags, blocked). RC-1 hits degrade `wired`→`partial` + add `needs_real_implementation`.
+    RC-7 hits set blocked=True (caller must abort write). Live-process verbs (no changeset scope) skip.
+    """
+    paths = _rc_changeset_paths()
+    if not paths:
+        return verdict, [], False  # no changeset → skip per SKILL.md
+    stub_re = re.compile("|".join(RC1_STUB_PATTERNS))
+    hook_re = re.compile("|".join(RC7_HOOKOUT_PATTERNS))
+    stub_hits: list[str] = []
+    hook_hits: list[str] = []
+    for root in paths:
+        if not root.exists():
+            continue
+        candidates = [root] if root.is_file() else list(root.rglob("*"))
+        for f in candidates:
+            if not f.is_file():
+                continue
+            try:
+                rel = str(f)
+                if hook_re.search(rel):
+                    hook_hits.append(rel)
+                if f.suffix in (".py", ".sh", ".js", ".ts", ".md", ".json"):
+                    text = f.read_text(errors="ignore")
+                    for m in stub_re.finditer(text):
+                        stub_hits.append(f"{rel}: {m.group(0)}")
+                        if len(stub_hits) >= 20:
+                            break
+            except Exception:
+                continue
+    tags: list[str] = []
+    new_verdict = verdict
+    blocked = False
+    if stub_hits:
+        if verdict == "wired":
+            new_verdict = "partial"
+        tags.append("needs_real_implementation")
+        print(f"RC-1 [{mode}]: {len(stub_hits)} stub marker(s); verdict {verdict}→{new_verdict}", file=sys.stderr)
+        for h in stub_hits[:5]:
+            print(f"  RC-1 hit: {h}", file=sys.stderr)
+    if hook_hits:
+        blocked = True
+        print(f"RC-7 BLOCK: {len(hook_hits)} hook-output file(s) in changeset", file=sys.stderr)
+        for h in hook_hits[:5]:
+            print(f"  RC-7 hit: {h}", file=sys.stderr)
+    return new_verdict, tags, blocked
 LEDGER_HEADER = """# Realization Debt Ledger
 
 Append-only log of "I built X but never wired / verified / lived with X." Entries seeded by `/debug check`, `/debug bug`, `/debug drift`, and the consistency-daemon orphan-sweep detector (S5).
@@ -361,8 +433,12 @@ def cmd_check(target: str) -> int:
                 verdict=verdict, phase4_evidence=phase4_evidence,
                 feature_evidence=feature_evidence, dependency_map=dependency_map,
                 freshness=freshness_note, detected_via=f"/debug check {target}")
+        verdict, _rc_tags, _blocked = run_realization_checks(verdict, mode="wiring")
+        if _blocked:
+            print("RC-7 BLOCK: refusing ledger write — remove hook-output files from changeset", file=sys.stderr)
+            return 2
         ledger_id = _disc.atomic_ledger_append(body_fn, header_if_new=LEDGER_HEADER)
-        ledger_note = "(new entry)"
+        ledger_note = "(new entry)" + (f" tags={_rc_tags}" if _rc_tags else "")
 
     out = {
         "verb": "check", "target": target, "verdict": verdict,
@@ -647,8 +723,12 @@ fresh evidence: n/a
   - preventive: (TBD)
   - detection: (TBD)
 """
+    _, _rc_tags, _blocked = run_realization_checks(verdict, mode="bug")
+    if _blocked:
+        print("RC-7 BLOCK: bug-mode ledger write refused — remove hook-output files from changeset", file=sys.stderr)
+        return 2
     ledger_id = _disc.atomic_ledger_append(body_fn, header_if_new=LEDGER_HEADER)
-    _bug_step(16, "LEDGER", f"wrote {ledger_id} (status={'inconclusive' if dry else 'open'})")
+    _bug_step(16, "LEDGER", f"wrote {ledger_id} (status={'inconclusive' if dry else 'open'}{' tags=' + str(_rc_tags) if _rc_tags else ''})")
 
     print()
     print(f"--- /debug bug \"{symptom}\" → verdict: {verdict} ---")
@@ -846,8 +926,12 @@ def cmd_drift(argv: list[str]) -> int:
                                  feature=feature, verdict=verdict, evidence=evidence,
                                  dependency_map=dependency_map, freshness=freshness,
                                  detected_via=detected_via, countermeasures=countermeasures)
+    verdict, _rc_tags, _blocked = run_realization_checks(verdict, mode="drift")
+    if _blocked:
+        print("RC-7 BLOCK: drift ledger write refused — remove hook-output files from changeset", file=sys.stderr)
+        return 2
     ledger_id = _disc.atomic_ledger_append(body_fn, header_if_new=LEDGER_HEADER)
-    _bug_step(16, "LEDGER", f"wrote {ledger_id} (verdict={verdict})")
+    _bug_step(16, "LEDGER", f"wrote {ledger_id} (verdict={verdict}{' tags=' + str(_rc_tags) if _rc_tags else ''})")
 
     out = {"verb": "drift", "target": target, "verdict": verdict,
            "evidence": evidence, "ledger_entry": ledger_id, "freshness": freshness}
@@ -1038,8 +1122,12 @@ def cmd_flaky(argv: list[str]) -> int:
                                  feature=bug_slug, verdict=verdict, evidence=evidence,
                                  dependency_map="n/a (flaky mode)", freshness=freshness,
                                  detected_via=detected_via, countermeasures=countermeasures)
+    verdict, _rc_tags, _blocked = run_realization_checks(verdict, mode="flaky")
+    if _blocked:
+        print("RC-7 BLOCK: flaky ledger write refused — remove hook-output files from changeset", file=sys.stderr)
+        return 2
     ledger_id = _disc.atomic_ledger_append(body_fn, header_if_new=LEDGER_HEADER)
-    _bug_step(16, "LEDGER", f"wrote {ledger_id} (verdict={verdict})")
+    _bug_step(16, "LEDGER", f"wrote {ledger_id} (verdict={verdict}{' tags=' + str(_rc_tags) if _rc_tags else ''})")
 
     out = {"verb": "flaky", "symptom": symptom, "verdict": verdict, "runs": runs,
            "failures": fail_count, "ledger_entry": ledger_id, "flaky_runs": str(flaky_runs_path)}
@@ -1199,8 +1287,12 @@ def cmd_performance(argv: list[str]) -> int:
                                  feature=feature, verdict=verdict, evidence=evidence,
                                  dependency_map=dependency_map, freshness=freshness,
                                  detected_via=detected_via, countermeasures=countermeasures)
+    verdict, _rc_tags, _blocked = run_realization_checks(verdict, mode="performance")
+    if _blocked:
+        print("RC-7 BLOCK: performance ledger write refused — remove hook-output files from changeset", file=sys.stderr)
+        return 2
     ledger_id = _disc.atomic_ledger_append(body_fn, header_if_new=LEDGER_HEADER)
-    _bug_step(16, "LEDGER", f"wrote {ledger_id} (verdict={verdict})")
+    _bug_step(16, "LEDGER", f"wrote {ledger_id} (verdict={verdict}{' tags=' + str(_rc_tags) if _rc_tags else ''})")
 
     out = {"verb": "performance", "target": target, "verdict": verdict,
            "evidence": evidence, "ledger_entry": ledger_id, "freshness": freshness}

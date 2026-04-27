@@ -7,7 +7,19 @@ set -euo pipefail
 
 DATE=$(TZ=Asia/Hong_Kong date +%Y-%m-%d)
 
-echo "=== /upskill | DATE=$DATE | mode=skeleton ==="
+# --- Self-skeleton-detect (per SKILL.md §Self-skeleton-detect, 2026-04-27) ---
+# /upskill must refuse to fake "I ran a scan" if its own SOP steps are unwired stubs.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+STUB_HITS=$(grep -rE --exclude=upskill.sh '\[stub\] step|return 0  # stub|stub_step|TODO[: ]' \
+    "$SCRIPT_DIR" "$SCRIPT_DIR/../references/" 2>/dev/null | wc -l | tr -d ' ')
+if [ "$STUB_HITS" -gt 0 ]; then
+    echo "==> /upskill self-check: $STUB_HITS stub marker(s) found in own implementation"
+    echo "==> SOP steps not yet wired. Cannot claim sweep results — output is meta-stub."
+    echo "==> See: ~/.ship/upskill/goals/02-plan.md §S2-S7 for unbuilt slices."
+    exit 0  # graceful exit — refuse to produce fake results
+fi
+
+echo "=== /upskill | DATE=$DATE | self-check=PASS ==="
 
 # Step 1 (S4): external scout via gh CLI. Writes JSON to /tmp; jq prints summary line.
 SCOUT_OUT="/tmp/upskill_scout_$$.json"
