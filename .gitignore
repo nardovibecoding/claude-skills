@@ -1,2 +1,6 @@
-.DS_Store
 __pycache__/
+.cache/
+.DS_Store
+.transformers-cache/
+*.cache
+node_modules/
