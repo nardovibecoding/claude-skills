@@ -1483,7 +1483,7 @@ _DRIFT_REPO_BY_HOST = {
 # expressible as deterministic rules auto-fire. bug/flaky/race need symptom
 # strings + interactive reproduction → NEVER auto-fire (panel noise risk).
 # wedge/leak/performance scaffolding deferred to future ships (S3-S5).
-_AUTO_DETECTORS = {"wiring", "drift", "wedge"}
+_AUTO_DETECTORS = {"wiring", "drift", "wedge", "leak"}
 
 
 def _drift_recheck(host: str) -> list[dict]:
@@ -1661,6 +1661,176 @@ def _wedge_recheck(unit: str, host: str) -> dict | None:
         return None
 
 
+_LEAK_HISTORY_DIR = Path.home() / ".cache" / "bigd" / "rss_history"
+_LEAK_THRESHOLD_LOW = 30  # >30% climb → low severity
+_LEAK_THRESHOLD_MED = 50  # >50% → medium
+_LEAK_THRESHOLD_HIGH = 100  # >100% → high
+_LEAK_HISTORY_KEEP_DAYS = 30  # rolling window
+
+
+def _leak_proposed_action(unit: str, host: str, pid: str,
+                          rss_now: int, rss_old: int,
+                          pct_climb: float, severity: str) -> dict:
+    """Build a schema-valid 18-field proposed_action for a leak_suspect finding."""
+    run_date = datetime.now(timezone.utc).strftime("%Y%m%d")
+    short_hash = hashlib.sha1(
+        f"{unit}{host}{pid}{rss_now}".encode()
+    ).hexdigest()[:6]
+    finding_id = (f"debug_{host}_{run_date}_leak_"
+                  f"{re.sub(r'[^a-z0-9]', '_', unit.lower())}_{short_hash}")
+    finding_id = re.sub(r"[^a-z0-9_-]", "_", finding_id)
+    risk_map = {"low": "LOW", "medium": "MEDIUM", "high": "HIGH"}
+    return {
+        "id": f"debug_{host}_{run_date}_{short_hash}",
+        "title": (f"Leak suspect: {unit} on {host} "
+                  f"(RSS {rss_old}→{rss_now}KB, +{pct_climb:.0f}%)"),
+        "before": (f"systemd unit {unit} MainPID={pid} RSS climbed "
+                   f"from {rss_old}KB ({_LEAK_HISTORY_KEEP_DAYS}-day window baseline) "
+                   f"to {rss_now}KB current (+{pct_climb:.1f}%)."),
+        "after": (f"Operator runs `/debug leak {unit}` on {host} for "
+                  f"heap-tracker + alloc-site analysis; identify retainer."),
+        "reason": (f"Leak detector: ps-snapshot RSS-history compare crossed "
+                   f"{severity}-tier threshold (LOW={_LEAK_THRESHOLD_LOW}%, "
+                   f"MED={_LEAK_THRESHOLD_MED}%, HIGH={_LEAK_THRESHOLD_HIGH}%)."),
+        "risk": risk_map.get(severity, "LOW"),
+        "affected_subsystems": [f"systemd:{unit}", f"debug-{host}"],
+        "affected_graph_nodes": [],
+        "upstream_deps": [],
+        "downstream_deps": [],
+        "hub_impact": [],
+        "blast_radius_score": "MED" if severity in ("medium", "high") else "LOW",
+        "conflicts_with": [],
+        "depends_on": [],
+        "action_type": "inbox_archive",
+        "action_params": {"finding_id": finding_id, "unit": unit, "host": host,
+                          "pid": pid, "rss_now_kb": rss_now,
+                          "rss_old_kb": rss_old,
+                          "pct_climb": round(pct_climb, 2)},
+        "auto_applyable": False,
+        "approval_required": True,
+    }
+
+
+def _leak_recheck(unit: str, host: str) -> dict | None:
+    """RSS-history scan for unit's process. Compare current RSS vs ~24h-old entry.
+
+    Per plan §1.2 leak row + §4 R-RSS-history-cold-start.
+    Inputs: systemd unit + host.
+    Algorithm:
+      1. Resolve PID via `systemctl --user show -p MainPID --value <unit>` (fallback to system).
+      2. Snapshot RSS via `ps -o rss= -p <pid>` (returns KB).
+      3. Append current snapshot to ~/.cache/bigd/rss_history/<unit>_<host>.jsonl.
+      4. Find oldest entry within last (12h, 30d] window.
+         - No entry older than 12h → cold-start, return None (write only).
+      5. Compute pct_climb = (rss_now - rss_old) / rss_old * 100.
+      6. Threshold map: >30%→low, >50%→medium, >100%→high. Below 30% → None.
+      7. Trim history file to last 30d on each call.
+    Returns: proposed_action dict (18 schema fields) or None.
+    Fail-closed: any exception → return None. Caller concats `; leak:<exc>` to known_gaps.
+    """
+    try:
+        # Step 1: PID via systemctl (try user then system).
+        pid = ""
+        for sysctl in (["systemctl", "--user", "show", "-p", "MainPID",
+                        "--value", unit],
+                       ["systemctl", "show", "-p", "MainPID",
+                        "--value", unit]):
+            try:
+                r = subprocess.run(sysctl, capture_output=True, text=True,
+                                   timeout=3)
+                if r.returncode == 0 and r.stdout.strip().isdigit():
+                    p = r.stdout.strip()
+                    if p != "0":
+                        pid = p
+                        break
+            except Exception:
+                continue
+        if not pid:
+            return None  # unit unknown / not running / mac (no systemctl)
+
+        # Step 2: RSS via ps.
+        ps = subprocess.run(["ps", "-o", "rss=", "-p", pid],
+                            capture_output=True, text=True, timeout=3)
+        if ps.returncode != 0:
+            return None
+        try:
+            rss_now = int(ps.stdout.strip().split()[0])
+        except (ValueError, IndexError):
+            return None
+
+        # Step 3: append snapshot.
+        _LEAK_HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+        hist_file = _LEAK_HISTORY_DIR / f"{unit}_{host}.jsonl"
+        now = datetime.now(timezone.utc)
+        snapshot = {"ts": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "rss_kb": rss_now, "pid": pid}
+
+        # Read existing history.
+        history: list[dict] = []
+        if hist_file.exists():
+            try:
+                for line in hist_file.read_text().splitlines():
+                    if line.strip():
+                        history.append(json.loads(line))
+            except Exception:
+                history = []
+
+        # Step 7 (trim, do before append so write is clean).
+        cutoff_old = now.timestamp() - (_LEAK_HISTORY_KEEP_DAYS * 86400)
+        history = [
+            h for h in history
+            if _parse_iso_ts(h.get("ts", "")) > cutoff_old
+        ]
+        history.append(snapshot)
+
+        # Step 4: cold-start check — find oldest entry >12h ago.
+        cutoff_12h = now.timestamp() - (12 * 3600)
+        old_entries = [
+            h for h in history[:-1]  # exclude just-appended snapshot
+            if _parse_iso_ts(h.get("ts", "")) <= cutoff_12h
+        ]
+
+        # Persist history (always, even on cold-start).
+        hist_file.write_text(
+            "\n".join(json.dumps(h) for h in history) + "\n"
+        )
+
+        if not old_entries:
+            return None  # cold-start: insufficient history, no false positive
+
+        # Step 5: pct_climb vs OLDEST entry in window (most conservative).
+        baseline = min(old_entries, key=lambda h: _parse_iso_ts(h.get("ts", "")))
+        rss_old = int(baseline.get("rss_kb", 0))
+        if rss_old <= 0:
+            return None
+        pct_climb = (rss_now - rss_old) / rss_old * 100
+
+        # Step 6: threshold map.
+        if pct_climb >= _LEAK_THRESHOLD_HIGH:
+            severity = "high"
+        elif pct_climb >= _LEAK_THRESHOLD_MED:
+            severity = "medium"
+        elif pct_climb >= _LEAK_THRESHOLD_LOW:
+            severity = "low"
+        else:
+            return None  # below threshold, not a finding
+
+        return _leak_proposed_action(unit, host, pid, rss_now, rss_old,
+                                     pct_climb, severity)
+    except Exception:
+        return None  # fail-closed; caller concats "; leak:<exc>" to known_gaps
+
+
+def _parse_iso_ts(s: str) -> float:
+    """Parse YYYY-MM-DDTHH:MM:SSZ → epoch float. Returns 0 on failure."""
+    try:
+        dt = datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc)
+        return dt.timestamp()
+    except Exception:
+        return 0.0
+
+
 def _recheck_entry(entry: dict) -> dict:
     """Read-only re-verification of an open ledger entry. Returns verdict dict."""
     mode = entry.get("mode", "?")
@@ -1808,6 +1978,27 @@ def cmd_scan(argv: list[str]) -> int:
             wedge_gap = f"; wedge:{exc}"
             print(f"[debug scan] wedge_recheck failed: {exc}", file=sys.stderr)
 
+    # S4: leak recheck — same wedge_targets list, RSS-history compare, cap 5
+    # units per scan (plan §1.3). First-run on a unit writes history file, no
+    # finding (cold-start discipline per §4 R-RSS-history-cold-start).
+    leak_gap = ""
+    if "leak" in _AUTO_DETECTORS:
+        try:
+            leak_targets = _load_wedge_targets(host)[:5]
+            for unit in leak_targets:
+                try:
+                    f = _leak_recheck(unit, host)
+                    if f:
+                        proposed.append(f)
+                except Exception as exc:
+                    leak_gap += f"; leak[{unit}]:{exc}"
+                    print(f"[debug scan] leak_recheck({unit}) failed: {exc}",
+                          file=sys.stderr)
+            detectors_run.append("leak_recheck")
+        except Exception as exc:
+            leak_gap = f"; leak:{exc}"
+            print(f"[debug scan] leak_recheck failed: {exc}", file=sys.stderr)
+
     # Roll up severity from new proposed actions into the existing rollup.
     # Schema severities are lowercase; proposed_action `risk` field is uppercase.
     _risk_to_sev = {"CRITICAL": "critical", "HIGH": "high",
@@ -1861,9 +2052,9 @@ def cmd_scan(argv: list[str]) -> int:
         "self_report": {
             "daemon_health": "green" if duration < 30 else "yellow",
             "confidence_in_findings": "Rule-based recheck with no LLM; high confidence on wiring + drift verdicts. Other modes deferred.",
-            "known_gaps": ("leak/performance recheck not yet automated (S4-S5); "
+            "known_gaps": ("performance recheck not yet automated (S5); "
                           "flaky/bug/race remain manual-only per Rule-based>LLM"
-                          + drift_gap + wedge_gap),
+                          + drift_gap + wedge_gap + leak_gap),
         },
         "finding_lifecycle": {
             "new_ids": [],
