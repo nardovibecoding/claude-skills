@@ -1483,7 +1483,7 @@ _DRIFT_REPO_BY_HOST = {
 # expressible as deterministic rules auto-fire. bug/flaky/race need symptom
 # strings + interactive reproduction → NEVER auto-fire (panel noise risk).
 # wedge/leak/performance scaffolding deferred to future ships (S3-S5).
-_AUTO_DETECTORS = {"wiring", "drift", "wedge", "leak"}
+_AUTO_DETECTORS = {"wiring", "drift", "wedge", "leak", "performance"}
 
 
 def _drift_recheck(host: str) -> list[dict]:
@@ -1831,6 +1831,90 @@ def _parse_iso_ts(s: str) -> float:
         return 0.0
 
 
+_PERF_THRESHOLD_PCT = 50  # >50% delta vs baseline → regression finding
+
+
+def _performance_proposed_action(entry: dict, baseline_ms: int,
+                                 current_ms: int, delta_pct: float,
+                                 host: str) -> dict:
+    """Build a schema-valid 18-field proposed_action for a perf_regression finding."""
+    run_date = datetime.now(timezone.utc).strftime("%Y%m%d")
+    eid = entry.get("id", "unknown")
+    short_hash = hashlib.sha1(
+        f"{eid}{baseline_ms}{current_ms}".encode()
+    ).hexdigest()[:6]
+    finding_id = f"debug_{host}_{run_date}_perf_{eid}_{short_hash}"
+    finding_id = re.sub(r"[^a-z0-9_-]", "_", finding_id.lower())
+    severity = "high" if delta_pct >= 100 else "medium"
+    risk_map = {"medium": "MEDIUM", "high": "HIGH"}
+    return {
+        "id": f"debug_{host}_{run_date}_{short_hash}",
+        "title": (f"Perf regression: {eid} on {host} "
+                  f"({baseline_ms}→{current_ms}ms, +{delta_pct:.0f}%)"),
+        "before": (f"Ledger entry {eid} baseline_ms={baseline_ms} on {host}; "
+                   f"current probe latency {current_ms}ms (+{delta_pct:.1f}% vs baseline)."),
+        "after": (f"Operator runs `/debug performance {entry.get('target','?')}` "
+                  f"for full step-7 measurement + flamegraph; identify hot path."),
+        "reason": (f"Performance detector: probe re-run crossed "
+                   f"{_PERF_THRESHOLD_PCT}% delta-vs-baseline threshold."),
+        "risk": risk_map.get(severity, "MEDIUM"),
+        "affected_subsystems": [f"ledger:{eid}", f"debug-{host}"],
+        "affected_graph_nodes": [],
+        "upstream_deps": [],
+        "downstream_deps": [],
+        "hub_impact": [],
+        "blast_radius_score": "MED",
+        "conflicts_with": [],
+        "depends_on": [],
+        "action_type": "inbox_archive",
+        "action_params": {"finding_id": finding_id, "ledger_id": eid,
+                          "baseline_ms": baseline_ms,
+                          "current_ms": current_ms,
+                          "delta_pct": round(delta_pct, 2),
+                          "host": host},
+        "auto_applyable": False,
+        "approval_required": True,
+    }
+
+
+def _performance_recheck(entry: dict) -> dict | None:
+    """Re-run a stored baseline probe and detect regression vs baseline_ms.
+
+    Per plan §1.2 performance row: requires entry to carry both `baseline_ms`
+    (int) AND `baseline_cmd` (shell command string). Re-runs the cmd, measures
+    wall time, compares delta. >50% slower → regression finding. Below threshold
+    or missing fields → None.
+
+    Subprocess timeout: 10s hard cap.
+    Fail-closed: any exception → None. Caller concats `; perf:<exc>` to known_gaps.
+    """
+    try:
+        baseline_ms = entry.get("baseline_ms")
+        baseline_cmd = entry.get("baseline_cmd")
+        if not isinstance(baseline_ms, int) or not isinstance(baseline_cmd, str):
+            return None  # missing fields — entry not yet baseline-tagged
+        if baseline_ms <= 0 or not baseline_cmd.strip():
+            return None
+        host = entry.get("host", "unknown")
+
+        # Re-run probe with wall-clock measurement.
+        t0 = time.time()
+        r = subprocess.run(["bash", "-c", baseline_cmd],
+                           capture_output=True, text=True, timeout=10)
+        current_ms = int((time.time() - t0) * 1000)
+        if r.returncode != 0:
+            return None  # probe failed — not a perf signal
+
+        delta_pct = (current_ms - baseline_ms) / baseline_ms * 100
+        if delta_pct < _PERF_THRESHOLD_PCT:
+            return None  # within budget
+
+        return _performance_proposed_action(entry, baseline_ms, current_ms,
+                                            delta_pct, host)
+    except Exception:
+        return None  # fail-closed
+
+
 def _recheck_entry(entry: dict) -> dict:
     """Read-only re-verification of an open ledger entry. Returns verdict dict."""
     mode = entry.get("mode", "?")
@@ -1999,6 +2083,35 @@ def cmd_scan(argv: list[str]) -> int:
             leak_gap = f"; leak:{exc}"
             print(f"[debug scan] leak_recheck failed: {exc}", file=sys.stderr)
 
+    # S5: performance recheck — re-run baseline probes from ledger entries
+    # carrying both `baseline_ms` and `baseline_cmd` fields. Cap 5 entries
+    # per scan (plan §1.3). Today's ledger has no perf entries with
+    # baseline_cmd populated, so this is mostly a no-op until cmd_performance
+    # starts writing those fields. Forward-compat wiring per §1.2.
+    perf_gap = ""
+    if "performance" in _AUTO_DETECTORS:
+        try:
+            perf_entries = [
+                e for e in open_entries
+                if e.get("mode") == "performance"
+                and e.get("baseline_ms")
+                and e.get("baseline_cmd")
+            ][:5]
+            for e in perf_entries:
+                try:
+                    f = _performance_recheck(e)
+                    if f:
+                        proposed.append(f)
+                except Exception as exc:
+                    perf_gap += f"; perf[{e.get('id','?')}]:{exc}"
+                    print(f"[debug scan] performance_recheck({e.get('id','?')})"
+                          f" failed: {exc}", file=sys.stderr)
+            detectors_run.append("performance_recheck")
+        except Exception as exc:
+            perf_gap = f"; perf:{exc}"
+            print(f"[debug scan] performance_recheck failed: {exc}",
+                  file=sys.stderr)
+
     # Roll up severity from new proposed actions into the existing rollup.
     # Schema severities are lowercase; proposed_action `risk` field is uppercase.
     _risk_to_sev = {"CRITICAL": "critical", "HIGH": "high",
@@ -2052,9 +2165,8 @@ def cmd_scan(argv: list[str]) -> int:
         "self_report": {
             "daemon_health": "green" if duration < 30 else "yellow",
             "confidence_in_findings": "Rule-based recheck with no LLM; high confidence on wiring + drift verdicts. Other modes deferred.",
-            "known_gaps": ("performance recheck not yet automated (S5); "
-                          "flaky/bug/race remain manual-only per Rule-based>LLM"
-                          + drift_gap + wedge_gap + leak_gap),
+            "known_gaps": ("flaky/bug/race remain manual-only per Rule-based>LLM"
+                          + drift_gap + wedge_gap + leak_gap + perf_gap),
         },
         "finding_lifecycle": {
             "new_ids": [],
