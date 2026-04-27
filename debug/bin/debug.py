@@ -1360,6 +1360,185 @@ def _entry_severity(mode: str) -> str:
     }.get(mode, "info")
 
 
+# ---------------------------------------------------------------------------
+# S2: drift_recheck — rule-based detector for cmd_scan
+# Reads ledger entries with `wired_commit` SHA + `evidence_file` path; runs
+# `git rev-list --count <sha>..HEAD -- <evidence_file or ship_slug>` to detect
+# commit drift since the wiring entry. >0 = stale-soft, >10 = stale-hard.
+# Returns proposed_action[]-shaped dicts per daemon_summary schema. Read-only.
+# Plan ref: ~/.ship/debug-daemon/goals/02-plan.md §1.1, §1.2.
+# ---------------------------------------------------------------------------
+
+def _git_rev_count(repo: Path, since_sha: str, until: str = "HEAD",
+                   path_filter: str | None = None) -> int | None:
+    """Run `git -C <repo> rev-list --count <sha>..<until> [-- <path>]`.
+    Returns int count, or None on git error (treated as fail-closed: no finding)."""
+    if not repo.exists() or not (repo / ".git").exists():
+        return None
+    cmd = ["git", "-C", str(repo), "rev-list", "--count", f"{since_sha}..{until}"]
+    if path_filter:
+        cmd += ["--", path_filter]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            return None
+        return int(r.stdout.strip() or "0")
+    except (subprocess.SubprocessError, ValueError, OSError):
+        return None
+
+
+def _drift_proposed_action(entry: dict, host: str, severity: str,
+                           commit_count: int) -> dict:
+    """Build a schema-valid proposed_action dict for a drift finding.
+
+    action_type=inbox_archive (read-only review action; daemon emits no mutations
+    per spec §5 R4). 18 required fields per daemon_summary.schema.json $defs/proposed_action.
+    """
+    eid = entry["id"]
+    target = entry.get("target", f"{host}:{eid}")
+    sha = entry.get("wired_commit", "?")[:7]
+    run_date = datetime.now(timezone.utc).strftime("%Y%m%d")
+    short_hash = hashlib.sha1(
+        f"{eid}{sha}{commit_count}".encode()
+    ).hexdigest()[:6]
+    finding_id = f"debug_{host}_{run_date}_drift_{eid.lower().replace('-', '_')}_{short_hash}"
+    # finding_id must match ^[a-z0-9_-]+$
+    finding_id = re.sub(r"[^a-z0-9_-]", "_", finding_id)
+    risk = "MEDIUM" if severity == "stale-hard" else "LOW"
+    blast = "LOW" if severity == "stale-hard" else "NONE"
+    title = (f"Re-verify {target} ({eid}): {commit_count} commits since "
+             f"wired @ {sha} — {severity}")
+    return {
+        "id": f"debug_{host}_{run_date}_{short_hash}",
+        "title": title,
+        "before": (f"Ledger {eid} wired at {sha}; {commit_count} commits "
+                   f"have landed since on HEAD."),
+        "after": (f"Operator re-runs `/debug check {target}` to confirm "
+                  f"wiring still holds at HEAD; ledger updated if regressed."),
+        "reason": (f"Drift detector: rule-based git-rev-list count "
+                   f"{sha}..HEAD = {commit_count} (>0 threshold; "
+                   f"{'>10 hard' if severity == 'stale-hard' else 'soft'})."),
+        "risk": risk,
+        "affected_subsystems": ["realize-debt-ledger", f"debug-{host}"],
+        "affected_graph_nodes": [],
+        "upstream_deps": [],
+        "downstream_deps": [],
+        "hub_impact": [],
+        "blast_radius_score": blast,
+        "conflicts_with": [],
+        "depends_on": [],
+        "action_type": "inbox_archive",
+        "action_params": {"finding_id": finding_id},
+        "auto_applyable": False,
+        "approval_required": True,
+    }
+
+
+_DRIFT_REPO_BY_HOST = {
+    # Map ledger target host-prefix → local repo root holding wired_commit SHAs.
+    # London target SHAs land in ~/prediction-markets (pulled from Hel bare repo);
+    # most mac/hel infra SHAs live in ~/NardoWorld; .claude self-tracks separately.
+    "london": [HOME / "prediction-markets", HOME / "NardoWorld"],
+    "hel":    [HOME / "NardoWorld", HOME / "prediction-markets"],
+    "mac":    [HOME / "NardoWorld", HOME / ".claude", HOME / "prediction-markets"],
+}
+
+
+# S1: Auto-detector allowlist + stubs for cmd_scan (daemon-mode dispatch).
+# bug/flaky/race require symptom strings — NEVER auto-fire (panel noise).
+_AUTO_DETECTORS = {
+    "wiring_recheck",
+    "drift_recheck",
+    "wedge_recheck",
+    "leak_recheck",
+    "performance_recheck",
+}
+
+
+def _check_auto_detector_allowed(name: str) -> None:
+    """Raise if a caller tries to auto-fire a non-allowlisted detector
+    (bug/flaky/race need symptom strings — manual-only)."""
+    if name not in _AUTO_DETECTORS:
+        raise RuntimeError(
+            f"manual-mode auto-fire forbidden — {name} not in "
+            f"_AUTO_DETECTORS allowlist"
+        )
+
+
+def _wedge_recheck(host: str) -> list[dict]:
+    """Scheduled re-run of /debug wedge on bot units. Stub in S1; logic in S3."""
+    _check_auto_detector_allowed("wedge_recheck")
+    return []
+
+
+def _leak_recheck(host: str) -> list[dict]:
+    """Scheduled re-run of /debug leak on RSS-history candidates. Stub in S1; logic in S4."""
+    _check_auto_detector_allowed("leak_recheck")
+    return []
+
+
+def _performance_recheck(host: str) -> list[dict]:
+    """Scheduled re-run of /debug performance on hot-process candidates. Stub in S1; logic in S5."""
+    _check_auto_detector_allowed("performance_recheck")
+    return []
+
+
+def _drift_recheck(host: str) -> list[dict]:
+    """Re-check open wiring ledger entries for commit drift.
+
+    Reads ~/NardoWorld/realize-debt.md (unified ledger across hosts), filters:
+      - status == 'open' OR status == 'wired'  (wired entries can drift too)
+      - mode in ('wiring', 'check')
+      - wired_commit field present (looks like a SHA, not a placeholder)
+    For each, runs `git rev-list --count <sha>..HEAD` against candidate repos
+    for the entry's target host (london→prediction-markets first, etc.). First
+    repo where the SHA resolves wins. >0 = stale-soft; >10 = stale-hard.
+    Cap: 30 entries per spec §4 R-Token-cost. Returns list of proposed_action
+    dicts (empty list if no drift / no candidates / fail-closed git error).
+
+    Daemon scans the FULL ledger regardless of which host it's running on —
+    the ledger is shared (writer is /debug skill on whichever host); host arg
+    here is only used for the proposed_action `id` namespace.
+    """
+    out: list[dict] = []
+    try:
+        entries = _parse_ledger_entries()
+    except Exception:
+        return out  # fail-closed
+    candidates = []
+    for e in entries:
+        status = e.get("status", "")
+        if status not in ("open", "wired"):
+            continue
+        if e.get("mode") not in ("wiring", "check"):
+            continue
+        sha_raw = e.get("wired_commit", "").strip()
+        # Strip "(...)" placeholders like "(n/a — duplicate of R-0001)"
+        if not sha_raw or sha_raw.startswith("("):
+            continue
+        sha = sha_raw.split()[0].strip().rstrip(")")
+        if len(sha) < 7 or not re.match(r"^[0-9a-f]{7,40}$", sha):
+            continue
+        candidates.append((e, sha))
+        if len(candidates) >= 30:
+            break
+
+    for entry, sha in candidates:
+        target = entry.get("target", "")
+        t_host = target.split(":", 1)[0].strip().lower() if ":" in target else "mac"
+        repos = _DRIFT_REPO_BY_HOST.get(t_host, _DRIFT_REPO_BY_HOST["mac"])
+        n = None
+        for repo in repos:
+            n = _git_rev_count(repo, sha)
+            if n is not None:
+                break  # first repo that resolves the SHA wins
+        if n is None or n <= 0:
+            continue  # no drift OR SHA not found in any candidate repo
+        severity = "stale-hard" if n > 10 else "stale-soft"
+        out.append(_drift_proposed_action(entry, host, severity, n))
+    return out
+
+
 def _recheck_entry(entry: dict) -> dict:
     """Read-only re-verification of an open ledger entry. Returns verdict dict."""
     mode = entry.get("mode", "?")
@@ -1446,6 +1625,26 @@ def cmd_scan(argv: list[str]) -> int:
             sev_count[sev] += 1
 
     rot_count = sum(1 for e in open_entries if _entry_age_days(e) > 7)
+
+    # S1: dispatch the auto-allowlisted rechecks beyond wiring (which ran above
+    # via _recheck_entry). drift_recheck is real (S2 shipped); wedge/leak/perf
+    # are stubs returning [] until S3-S5. _check_auto_detector_allowed gates
+    # any name passed here.
+    proposed_actions: list[dict] = []
+    detectors_run = ["wiring_recheck"]
+    for det_name, det_fn in (
+        ("drift_recheck", _drift_recheck),
+        ("wedge_recheck", _wedge_recheck),
+        ("leak_recheck", _leak_recheck),
+        ("performance_recheck", _performance_recheck),
+    ):
+        _check_auto_detector_allowed(det_name)
+        try:
+            proposed_actions.extend(det_fn(host))
+            detectors_run.append(det_name)
+        except Exception as exc:
+            print(f"[debug scan] {det_name} failed: {exc}", file=sys.stderr)
+
     duration = round(time.time() - t0, 3)
     cron_completed = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     run_id = f"debug_{datetime.now(timezone.utc).strftime('%Y-%m-%d_%H:%M:%S')}Z"
@@ -1464,7 +1663,7 @@ def cmd_scan(argv: list[str]) -> int:
                 "cross_daemon_inputs": {},
             },
             "plan": {
-                "detectors_run": ["wiring_recheck"],
+                "detectors_run": detectors_run,
                 "skipped": skipped_other_status,
                 "rationale": "scan all status==open from realize-debt.md (read-only sub-helpers; cmd_check avoided to prevent ledger pollution)",
             },
@@ -1487,7 +1686,7 @@ def cmd_scan(argv: list[str]) -> int:
                 "feedback_to_next_spec": "interactive recheck still needed for drift/flaky/performance/bug modes",
             },
         },
-        "proposed_actions": [],
+        "proposed_actions": proposed_actions,
         "self_report": {
             "daemon_health": "green" if duration < 30 else "yellow",
             "confidence_in_findings": "Rule-based recheck with no LLM; high confidence on wiring verdicts. Other modes deferred to interactive recheck.",
