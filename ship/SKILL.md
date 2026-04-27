@@ -14,7 +14,8 @@ description: |
   Phase files loaded lazily — only current phase in context.
 verified_at: 2026-04-23
 documents:
-  - /Users/bernard/.claude/skills/ship/phases/bot/01-spec.md
+  # Phase files (bot/app × 01-05) are loaded LAZILY per dispatch — never list here.
+  # Only Big-SystemD master scope docs that the skill auto-loads in big-systemd mode.
   - /Users/bernard/NardoWorld/meta/phase4_scope.md
   - /Users/bernard/NardoWorld/meta/phase5_scope.md
   - /Users/bernard/NardoWorld/meta/phase6_scope.md

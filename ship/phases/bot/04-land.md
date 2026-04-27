@@ -85,6 +85,53 @@ Source: pm-london wedge 2026-04-25 — L1 wedge confirmed at T+11min, but protoc
 
 ---
 
+## §4.5 — DEPLOY GATES (mandatory when feature adds cron / timer / LaunchAgent / systemd unit)
+
+**Born from Apr 27 2026 bigd 6th-daemon race.** Bundle assembler ran 4-15s before slow daemons finished, captured 8/18. Pure timing race, not daemon bug. Three independent timers schedule-coincided. The fix below prevents every future variant.
+
+### G2 — Producer-consumer chain declaration (in artifact)
+
+Every new daemon/timer artifact MUST contain a `## Producer-consumer chain` block:
+
+```yaml
+produces: <output_path or topic>          # e.g. ~/inbox/_summaries/pending/<DATE>/<daemon>_<host>.json
+consumed_by: <next_stage_unit>            # e.g. bigd-collector
+chain_method: synchronous_call | done_marker | event_trigger
+                                          # NEVER schedule_coincidence
+```
+
+If any of these fields is missing or `chain_method == schedule_coincidence`, **Phase 4 cannot close.**
+
+### G3 — Failure-mode declaration
+
+What happens when upstream finishes late? Required choice in artifact:
+
+```yaml
+failure_mode_when_upstream_late: retry_next_tick | block_with_timeout | degrade_with_warning
+```
+
+`assume_complete` or absent → FAIL.
+
+### G4 — Refactor-proof contract (when adding a NEW producer to existing system)
+
+When the feature adds a producer to an existing N-producer system, the same PR MUST bump every consumer's expected count. Phase 4 reviewer checklist:
+
+- [ ] Searched callers of `_DAEMONS` / `_KNOWN_DAEMONS` / `EXPECTED_COUNT` / `expected.*=.*\d+` for stale N
+- [ ] Searched docs for "N daemons" / "N×3 = M instances" prose
+- [ ] All hits updated in same commit
+
+### Phase 4 closes by running /debug race
+
+After deploy, run:
+
+```bash
+python3 ~/.claude/skills/debug/bin/debug.py race <feature> --dry-run
+```
+
+Verdict must be `race_free`. `race_present (...)` blocks Phase 4 close. Findings paste into the §4.5 block.
+
+---
+
 ## Owning Agent
 
 **strict-execute + strict-plan** — use this agent's brief template for the phase artifact.

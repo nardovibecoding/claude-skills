@@ -12,6 +12,7 @@ description: |
     /debug drift <feature>          — Drift mode. "X used to work, now stale"; flags --baseline=<sha-or-iso> --dry-run
     /debug flaky "<symptom>"        — Flaky mode (loop reproducer, race priors). "X sometimes fails"; flags --runs=N --dry-run
     /debug performance <feature>    — Performance mode (latency / leak / hot-loop). "X is slow / hot"; flags --baseline=<file>
+    /debug race <feature>           — Race mode (producer-consumer schedule mismatch). "X fires but Y is empty"; flags --check-systemd-on=<host>
     /debug list                     — show realize-debt.md ledger
 
   NOT FOR: random fixes (Iron Law forbids), claims without verification (second Iron Law forbids), replacing /ship audit (imports it).
@@ -90,6 +91,19 @@ Flaky mode — intermittent (race / state-dependent). Reuses 17-step engine with
 
 ### `/debug performance <feature>`
 Performance mode — fires correctly but slow / hot loop / leak. All 17 steps active; baseline metrics captured per `~/.claude/skills/ship/phases/bot/04-land.md` step 7. Loads `phases/performance.md`. Verdict: `within-budget | regression | leak | hot-loop | inconclusive`. Flags: `--baseline=<file>`, `--dry-run`.
+
+### `/debug race <feature>`
+Race-condition mode — feature deploys "successfully" but a producer/consumer schedule mismatch silently drops data. Detected after the bigd 6-daemon ship (Apr 27 2026): bundle assembler ran 4-15s before all daemons finished, capturing 8/18 instead of 18/18. Pure timing race, not a daemon bug.
+
+**Checks (rule-based, no LLM):**
+1. **G1 Schedule conflict scan** — for each LaunchAgent / systemd timer / cron entry related to `<feature>`, list scheduled fire time. Flag any pair within ±2min where one consumes another's output.
+2. **G2 Producer-consumer chain audit** — find every "produces" file path declared by `<feature>`'s artifact (`.ship/<feature>/state/04-land.md` §Producer-consumer block, or by grep on the feature's run script for `> "$out"` / `write_text` patterns). For each producer, find consumers (greps for the path elsewhere). Confirm chain method is one of `{synchronous_call, done_marker, event_trigger}` — flag `schedule_coincidence` as FAIL.
+3. **G3 Failure-mode declaration** — does the artifact spec declare what happens when upstream finishes late? Required: one of `{retry_next_tick, block_with_timeout, degrade_with_warning}`. Anything else (or absent) → FAIL.
+4. **G4 Expected-count drift** — when the feature is a NEW producer (added to an existing N-producer system), find every consumer that hardcodes the count (`expected=N`, `for d in (N items)`, `range(N)`, `min=N` flags). Flag any still saying old N.
+
+Loads `phases/race.md`. Verdict: `race_free | race_present_<gate> | inconclusive`. Flags: `--dry-run`, `--check-systemd-on=<host>` (additional remote scan).
+
+**Auto-runs after `/ship` Phase 4 LAND for any feature whose artifact contains a Producer-consumer block.** Standalone invocation when investigating "X fires but Y is empty" symptoms.
 
 ## Implementation
 

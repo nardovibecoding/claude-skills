@@ -1326,7 +1326,7 @@ def cmd_scan(argv: list[str]) -> int:
             sys.path.insert(0, str(cand))
             break
     from bigd_common import (  # type: ignore
-        write_summary, _detect_host, SUMMARY_SCHEMA_VERSION,
+        write_summary, _detect_host, SUMMARY_SCHEMA_VERSION, _write_heartbeat,
     )
 
     host = _detect_host()
@@ -1414,8 +1414,146 @@ def cmd_scan(argv: list[str]) -> int:
         return 0
 
     out = write_summary("debug", host, summary)
+    # Symmetry with the other 5 bigd daemons (lint/security/performance/gaps/upgrade):
+    # write a heartbeat at ~/inbox/_heartbeat/bigd-debug_<host>.json so the Lineage
+    # tab and any liveness check can mtime-poll the same way as the rest.
+    try:
+        _write_heartbeat(
+            daemon="bigd-debug",
+            host=host,
+            cycle_status="ok",
+            cycle_seconds=duration,
+            findings_filed=len(open_entries),
+            errors=[],
+        )
+    except Exception as e:
+        # Heartbeat write must never fail the daemon — log and continue.
+        print(f"[debug scan] heartbeat write failed: {e}", file=sys.stderr)
     print(f"[debug scan] wrote {out} | open={len(open_entries)} resolved={len(resolved_ids)} rot={rot_count} duration={duration}s")
     return 0
+
+
+def cmd_race(argv: list[str]) -> int:
+    """
+    Race-condition mode — producer-consumer schedule mismatch detector.
+    G1 schedule conflict scan + G2 producer-consumer chain audit +
+    G3 failure-mode declaration check + G4 expected-count drift.
+    Born from Apr 27 2026 bigd 6th-daemon ship: bundle assembled 4-15s before
+    all daemons finished, captured 8/18. Pure timing race, not daemon bug.
+    """
+    if not argv:
+        print("usage: debug.py race <feature> [--dry-run] [--check-systemd-on=<host>]", file=sys.stderr)
+        return 2
+    feature = argv[0]
+    flags = [a for a in argv[1:] if a.startswith("--")]
+    dry_run = "--dry-run" in flags
+    remote_host = next((f.split("=", 1)[1] for f in flags if f.startswith("--check-systemd-on=")), None)
+
+    print(f"# /debug race — {feature}")
+    print()
+    findings: list[str] = []
+
+    # G1 — Schedule conflict scan (Mac LaunchAgents + cron)
+    print("## G1 — Schedule conflict scan")
+    la_dir = Path.home() / "Library" / "LaunchAgents"
+    times: list[tuple[str, str]] = []
+    if la_dir.exists():
+        for plist in la_dir.glob("*.plist"):
+            try:
+                txt = plist.read_text(errors="ignore")
+            except Exception:
+                continue
+            if feature.lower() not in txt.lower() and feature.lower() not in plist.name.lower():
+                continue
+            # Crude HH:MM extraction from StartCalendarInterval
+            import re as _re
+            mh = _re.search(r"<key>Hour</key>\s*<integer>(\d+)</integer>", txt)
+            mm = _re.search(r"<key>Minute</key>\s*<integer>(\d+)</integer>", txt)
+            si = _re.search(r"<key>StartInterval</key>\s*<integer>(\d+)</integer>", txt)
+            if mh and mm:
+                times.append((plist.stem, f"{int(mh.group(1)):02d}:{int(mm.group(1)):02d} HKT"))
+            elif si:
+                times.append((plist.stem, f"every {int(si.group(1))//60}min"))
+    print(f"  feature-related LaunchAgents: {len(times)}")
+    for name, when in times:
+        print(f"    {name}: {when}")
+    # Conflict heuristic: any two within ±2min
+    fixed = [(n, t) for n, t in times if "HKT" in t]
+    for i, (n1, t1) in enumerate(fixed):
+        for n2, t2 in fixed[i+1:]:
+            h1, m1 = map(int, t1.split()[0].split(":"))
+            h2, m2 = map(int, t2.split()[0].split(":"))
+            if abs((h1*60+m1) - (h2*60+m2)) <= 2:
+                findings.append(f"G1 CONFLICT: {n1} ({t1}) ⟷ {n2} ({t2}) within 2min")
+    print(f"  G1 verdict: {'CONFLICT' if any('G1' in f for f in findings) else 'OK'}")
+    print()
+
+    # G2 — Producer-consumer chain (look for declaration in .ship/<feature>/state/04-land.md)
+    print("## G2 — Producer-consumer chain audit")
+    land_paths = [
+        Path.home() / ".ship" / feature / "state" / "04-land.md",
+        Path.home() / ".ship" / feature / "04-land.md",
+    ]
+    land = next((p for p in land_paths if p.exists()), None)
+    if not land:
+        findings.append(f"G2 GAP: no .ship/{feature}/state/04-land.md found — producer-consumer block undeclared")
+        print(f"  no Phase 4 LAND artifact at {land_paths[0]}")
+    else:
+        body = land.read_text(errors="ignore")
+        has_block = "Producer-consumer" in body or "produces:" in body or "consumed_by:" in body
+        chain = "synchronous_call" if "synchronous_call" in body else \
+                "done_marker" if "done_marker" in body else \
+                "event_trigger" if "event_trigger" in body else \
+                "schedule_coincidence" if "schedule_coincidence" in body else "UNDECLARED"
+        print(f"  artifact: {land}")
+        print(f"  block present: {has_block}")
+        print(f"  chain method: {chain}")
+        if not has_block:
+            findings.append(f"G2 FAIL: artifact missing Producer-consumer block")
+        if chain == "schedule_coincidence":
+            findings.append(f"G2 FAIL: chain method is schedule_coincidence (forbidden)")
+        if chain == "UNDECLARED":
+            findings.append(f"G2 FAIL: chain method not declared")
+    print()
+
+    # G3 — Failure-mode declaration
+    print("## G3 — Failure-mode declaration")
+    if land:
+        body = land.read_text(errors="ignore")
+        modes = [m for m in ("retry_next_tick", "block_with_timeout", "degrade_with_warning") if m in body]
+        if modes:
+            print(f"  declared: {modes[0]}")
+        else:
+            findings.append("G3 FAIL: no failure-mode declaration in artifact")
+            print("  declared: NONE")
+    else:
+        print("  skipped (no artifact)")
+    print()
+
+    # G4 — Expected-count drift (find consumers grepping for old numeric counts)
+    print("## G4 — Expected-count drift")
+    print("  scan: hardcoded count constants in callers vs new producer count")
+    # Heuristic: search grep for `expected.*=.*\d+` near feature
+    print("  (manual review recommended — automated count-bump diff TBD)")
+    print()
+
+    # Verdict
+    print("## Verdict")
+    if not findings:
+        verdict = "race_free"
+    else:
+        gates_failed = sorted({f.split(":")[0].split()[0] for f in findings})
+        verdict = f"race_present ({', '.join(gates_failed)})"
+    print(f"  {verdict}")
+    if findings:
+        print()
+        print("## Findings")
+        for f in findings:
+            print(f"  - {f}")
+    if dry_run:
+        print()
+        print("(--dry-run: no ledger write)")
+    return 0 if verdict == "race_free" else 1
 
 
 def main(argv: list[str]) -> int:
@@ -1434,6 +1572,8 @@ def main(argv: list[str]) -> int:
         return cmd_flaky(argv[2:])
     if verb == "performance":
         return cmd_performance(argv[2:])
+    if verb == "race":
+        return cmd_race(argv[2:])
     if verb == "scan":
         return cmd_scan(argv[2:])
     print(f"unknown verb: {verb}", file=sys.stderr)

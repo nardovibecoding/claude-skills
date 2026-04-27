@@ -56,6 +56,23 @@ Full ritual — users depend on quality.
 
 ---
 
+## §4.5 — DEPLOY GATES (mandatory when feature adds cron / timer / scheduled job / background worker)
+
+Same gates as bot/04-land.md §4.5. Apps with backgrounded jobs / scheduled workers / queues must declare:
+
+```yaml
+produces: <output_path or topic>
+consumed_by: <next_stage_unit>
+chain_method: synchronous_call | done_marker | event_trigger   # NEVER schedule_coincidence
+failure_mode_when_upstream_late: retry_next_tick | block_with_timeout | degrade_with_warning
+```
+
+When the feature adds a NEW producer to an existing N-producer system, every consumer's expected count must be bumped in the same commit.
+
+After deploy, run `python3 ~/.claude/skills/debug/bin/debug.py race <feature> --dry-run`. Verdict must be `race_free`. See bot/04-land.md §4.5 for full rationale.
+
+---
+
 ## Owning Agent
 
 **strict-execute + strict-plan** — use this agent's brief template for the phase artifact.
