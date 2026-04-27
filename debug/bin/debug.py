@@ -1483,7 +1483,7 @@ _DRIFT_REPO_BY_HOST = {
 # expressible as deterministic rules auto-fire. bug/flaky/race need symptom
 # strings + interactive reproduction → NEVER auto-fire (panel noise risk).
 # wedge/leak/performance scaffolding deferred to future ships (S3-S5).
-_AUTO_DETECTORS = {"wiring", "drift"}
+_AUTO_DETECTORS = {"wiring", "drift", "wedge"}
 
 
 def _drift_recheck(host: str) -> list[dict]:
@@ -1540,6 +1540,125 @@ def _drift_recheck(host: str) -> list[dict]:
         severity = "stale-hard" if n > 10 else "stale-soft"
         out.append(_drift_proposed_action(entry, host, severity, n))
     return out
+
+
+# ---------------------------------------------------------------------------
+# S3: wedge_recheck — config-driven host-local kernel-state probe.
+# Reads `wedge_targets.json` for current host; for each unit, invokes
+# `bin/wedge-capture.sh --capture-only <unit>` (5s subprocess cap). Parses
+# output for /proc/PID/wchan + state. D-state OR (S-state with lines30s<200)
+# = wedge_suspect. Mac → empty target list → no calls.
+# Plan ref: ~/.ship/debug-daemon/goals/02-plan.md §1.2, §1.3, §1.6.
+# ---------------------------------------------------------------------------
+
+_WEDGE_TARGETS_PATH = HOME / ".claude" / "skills" / "debug" / "wedge_targets.json"
+_WEDGE_CAPTURE_SH = HOME / ".claude" / "skills" / "debug" / "bin" / "wedge-capture.sh"
+
+
+def _load_wedge_targets(host: str) -> list[str]:
+    """Load wedge probe target units for `host` from wedge_targets.json.
+
+    Returns []: missing file (silent), JSON parse error (stderr log, fail-closed),
+    or unknown host. Lookup is case-insensitive.
+    Plan §1.6.
+    """
+    try:
+        if not _WEDGE_TARGETS_PATH.exists():
+            return []
+        with _WEDGE_TARGETS_PATH.open("r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"[debug scan] _load_wedge_targets: {exc}", file=sys.stderr)
+        return []
+    if not isinstance(cfg, dict):
+        return []
+    key = host.lower()
+    # Case-insensitive lookup over keys.
+    for k, v in cfg.items():
+        if k.lower() == key and isinstance(v, list):
+            return [str(u) for u in v if isinstance(u, str) and u.strip()]
+    return []
+
+
+def _wedge_proposed_action(unit: str, host: str, state: str, wchan: str,
+                           pid: str, lines30s: str) -> dict:
+    """Build a schema-valid 18-field proposed_action for a wedge_suspect finding."""
+    run_date = datetime.now(timezone.utc).strftime("%Y%m%d")
+    short_hash = hashlib.sha1(
+        f"{unit}{host}{state}{wchan}{pid}".encode()
+    ).hexdigest()[:6]
+    finding_id = f"debug_{host}_{run_date}_wedge_{re.sub(r'[^a-z0-9]', '_', unit.lower())}_{short_hash}"
+    finding_id = re.sub(r"[^a-z0-9_-]", "_", finding_id)
+    return {
+        "id": f"debug_{host}_{run_date}_{short_hash}",
+        "title": f"Wedge suspect: {unit} on {host} (state={state}, wchan={wchan})",
+        "before": (f"systemd unit {unit} MainPID={pid} reports state={state} "
+                   f"wchan={wchan} lines30s={lines30s}; process appears alive "
+                   f"but not executing."),
+        "after": (f"Operator runs `/debug wedge {unit}` on {host} for full "
+                  f"25-min trace + DEEP CAPTURE; root cause kernel-sleep symbol."),
+        "reason": (f"Wedge detector: --capture-only probe parsed state={state} "
+                   f"(D=uninterruptible / S+lines30s<200=quiet) → wedge_suspect."),
+        "risk": "HIGH",
+        "affected_subsystems": [f"systemd:{unit}", f"debug-{host}"],
+        "affected_graph_nodes": [],
+        "upstream_deps": [],
+        "downstream_deps": [],
+        "hub_impact": [],
+        "blast_radius_score": "MED",
+        "conflicts_with": [],
+        "depends_on": [],
+        "action_type": "inbox_archive",
+        "action_params": {"finding_id": finding_id, "unit": unit, "host": host,
+                          "state": state, "wchan": wchan, "pid": pid},
+        "auto_applyable": False,
+        "approval_required": True,
+    }
+
+
+def _wedge_recheck(unit: str, host: str) -> dict | None:
+    """Probe `unit` for wedge state via wedge-capture.sh --capture-only.
+
+    Subprocess timeout: 5s hard cap per spec §2 / plan §1.2 R-Token-cost.
+    Returns proposed_action dict if state==D OR (state==S AND lines30s<200);
+    else None. Fail-closed on any exception. No remote SSH — host-local only.
+    Plan §1.2 wedge row + §4 R-Wedge-capture-bash (no-D-state non-zero exit
+    treated as 'no finding' not error).
+    """
+    try:
+        if not _WEDGE_CAPTURE_SH.exists():
+            return None
+        r = subprocess.run(
+            ["bash", str(_WEDGE_CAPTURE_SH), "--capture-only", unit],
+            capture_output=True, text=True, timeout=5,
+        )
+        # Exit 1 = unit unknown / PID=0 / no systemctl (mac) / dead pid → no finding.
+        if r.returncode != 0:
+            return None
+        line = (r.stdout or "").strip().splitlines()[-1] if r.stdout else ""
+        # Parse: state=X wchan=Y pid=Z rss=N lines30s=M
+        kv = {}
+        for tok in line.split():
+            if "=" in tok:
+                k, v = tok.split("=", 1)
+                kv[k] = v
+        state = kv.get("state", "?")
+        wchan = kv.get("wchan", "?")
+        pid = kv.get("pid", "?")
+        try:
+            lines30s_n = int(kv.get("lines30s", "0"))
+        except (ValueError, TypeError):
+            lines30s_n = 0
+        is_d = state == "D"
+        is_quiet_s = state == "S" and lines30s_n < 200
+        if not (is_d or is_quiet_s):
+            return None
+        return _wedge_proposed_action(unit, host, state, wchan, pid,
+                                      str(lines30s_n))
+    except Exception:
+        # Fail-closed: any exception → None. Caller concats "; wedge:<exc>"
+        # to known_gaps via outer try in cmd_scan.
+        return None
 
 
 def _recheck_entry(entry: dict) -> dict:
@@ -1658,6 +1777,7 @@ def cmd_scan(argv: list[str]) -> int:
     proposed: list[dict] = []
     detectors_run = ["wiring_recheck"]
     drift_gap = ""
+    wedge_gap = ""
     if "drift" in _AUTO_DETECTORS:
         try:
             proposed.extend(_drift_recheck(host))
@@ -1665,6 +1785,28 @@ def cmd_scan(argv: list[str]) -> int:
         except Exception as exc:
             drift_gap = f"; drift:{exc}"
             print(f"[debug scan] drift_recheck failed: {exc}", file=sys.stderr)
+
+    # S3: wedge recheck — config-driven, host-local, cap 4 units per scan
+    # (plan §1.3 + §4 R-Token-cost). Mac wedge_targets=[] → no calls. Each
+    # unit invocation timeout-capped at 5s by _wedge_recheck. Fail-closed.
+    if "wedge" in _AUTO_DETECTORS:
+        try:
+            wedge_targets = _load_wedge_targets(host)[:4]
+            wedge_hits = 0
+            for unit in wedge_targets:
+                try:
+                    f = _wedge_recheck(unit, host)
+                    if f:
+                        proposed.append(f)
+                        wedge_hits += 1
+                except Exception as exc:
+                    wedge_gap += f"; wedge[{unit}]:{exc}"
+                    print(f"[debug scan] wedge_recheck({unit}) failed: {exc}",
+                          file=sys.stderr)
+            detectors_run.append("wedge_recheck")
+        except Exception as exc:
+            wedge_gap = f"; wedge:{exc}"
+            print(f"[debug scan] wedge_recheck failed: {exc}", file=sys.stderr)
 
     # Roll up severity from new proposed actions into the existing rollup.
     # Schema severities are lowercase; proposed_action `risk` field is uppercase.
@@ -1719,9 +1861,9 @@ def cmd_scan(argv: list[str]) -> int:
         "self_report": {
             "daemon_health": "green" if duration < 30 else "yellow",
             "confidence_in_findings": "Rule-based recheck with no LLM; high confidence on wiring + drift verdicts. Other modes deferred.",
-            "known_gaps": ("wedge/leak/performance recheck not yet automated (S3-S5); "
+            "known_gaps": ("leak/performance recheck not yet automated (S4-S5); "
                           "flaky/bug/race remain manual-only per Rule-based>LLM"
-                          + drift_gap),
+                          + drift_gap + wedge_gap),
         },
         "finding_lifecycle": {
             "new_ids": [],

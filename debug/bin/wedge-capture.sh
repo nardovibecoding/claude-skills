@@ -16,16 +16,48 @@
 # Source: /debug Wedge mode Step 0.5. Lesson: pm-london wedge 2026-04-27.
 
 set -uo pipefail
+
+# --capture-only mode: one-shot kernel-state probe (~3s wall) for /debug scan
+# daemon. No 25-min trace. Emits single line to stdout:
+#   state=<R|S|D|...> wchan=<sym> pid=<pid> rss=<kb> lines30s=<n>
+# Exit 0 always when MainPID resolves. Exit 1 when unit unknown / PID=0 /
+# systemctl missing (mac case). Caller (debug.py:_wedge_recheck) decides
+# wedge_suspect from state in {D} or state=S with lines30s<200.
+CAPTURE_ONLY=0
+if [ "${1:-}" = "--capture-only" ]; then
+  CAPTURE_ONLY=1
+  shift
+fi
+
 UNIT="${1:-}"
 if [ -z "$UNIT" ]; then
-  echo "usage: $0 <systemd-unit>" >&2
+  echo "usage: $0 [--capture-only] <systemd-unit>" >&2
   exit 2
+fi
+
+# systemctl may not exist (mac). Fail fast → caller treats as no finding.
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "no systemctl on this host" >&2
+  exit 1
 fi
 
 PID=$(systemctl show "$UNIT" -p MainPID --value 2>/dev/null)
 if [ -z "$PID" ] || [ "$PID" = "0" ]; then
   echo "no PID for unit=$UNIT" >&2
   exit 1
+fi
+
+if [ "$CAPTURE_ONLY" = "1" ]; then
+  if [ ! -d /proc/$PID ]; then
+    echo "DEAD pid=$PID unit=$UNIT" >&2
+    exit 1
+  fi
+  STATE=$(awk '/^State:/{print $2}' /proc/$PID/status 2>/dev/null)
+  RSS=$(awk '/^VmRSS:/{print $2}' /proc/$PID/status 2>/dev/null)
+  LINES=$(journalctl _PID=$PID --since '30 sec ago' --no-pager -q 2>/dev/null | wc -l)
+  WCHAN=$(cat /proc/$PID/wchan 2>/dev/null || echo '?')
+  echo "state=${STATE:-?} wchan=${WCHAN:-?} pid=$PID rss=${RSS:-0} lines30s=${LINES:-0}"
+  exit 0
 fi
 
 OUT=/tmp/wedge-trace-${PID}.log
