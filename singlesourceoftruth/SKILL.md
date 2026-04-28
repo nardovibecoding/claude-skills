@@ -12,35 +12,9 @@ user-invocable: true
 
 All state flows through git. No rsync (except cookies). No scp. Git is the bus.
 
-## Architecture (post 2026-04-23 migration)
+## Architecture
 
-```
-Mac ──push──> GitHub <──pull── Hel
-Mac ──push──> Hel bare repo <──pull── Hel working copy  (memory, NardoWorld)
-Mac ──push──> GitHub <──pull── London  (telegram-claude-bot + PM bots)
-```
-
-### What syncs and how
-
-| What | Repo | Mac path | Hel path | London path | Auto-sync |
-|------|------|----------|----------|-------------|-----------|
-| Bot code | GitHub:telegram-claude-bot | `~/telegram-claude-bot/` | `~/telegram-claude-bot/` | `~/telegram-claude-bot/` | London pulls every 1 min |
-| Skills | GitHub:claude-skills | `~/.claude/skills/` | `~/.claude/skills/` | — | Both sides every 10 min |
-| Hooks | GitHub:claude-quality-gate | `~/.claude/hooks/` | `~/.claude/hooks/` | — | Manual push + pull |
-| Memory | Hel bare: `hel:~/claude-memory.git` | `~/.claude/projects/-Users-bernard/memory/` | `~/.claude/projects/-home-bernard/memory/` | — | Hel cron `*/5 min` |
-| NardoWorld | Hel bare: `hel:~/nardoworld.git` | `~/NardoWorld/` | `~/NardoWorld/` | — | Hel cron `*/5 min` + Mac periodic push |
-| Cookies | rsync (only exception) | `~/telegram-claude-bot/twitter_cookies.json` | — | `~/telegram-claude-bot/twitter_cookies.json` | On refresh only |
-
-### What does NOT sync (stays local)
-
-| What | Why |
-|------|-----|
-| `.env` | Secrets — never in git |
-| `*.db`, `*.sqlite` | Memory DBs — platform-specific |
-| `venv/` | Python virtual env — platform-specific |
-| `.playwright_profile/` | Browser sessions — machine-specific |
-| `__pycache__/` | Compiled bytecode |
-| `data/*.jsonl` | Append-only runtime logs (platform-specific paths) |
+The full SSOT route map lives at `~/NardoWorld/meta/references/reference-memory-sync.md` (verified live; updated whenever sync architecture changes). This skill triggers on sync/deploy intents — see commands below. The canonical doc is the source of truth for which path is the latest version of any file.
 
 ## Hosts
 
