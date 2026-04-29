@@ -44,9 +44,13 @@ Inspect `$ARG` (the verb argument after `/memo`):
        TAG="${ARG#\#}"            # strip leading #
        TAG="$(echo "$TAG" | tr '[:upper:]' '[:lower:]' | awk '{print $1}')"  # lowercase, first token
        ;;
+     "search")
+       MODE=search
+       SEARCH_KW=""
+       ;;
      "search "*)
-       echo "(search mode — coming in slice S3)"
-       exit 0
+       MODE=search
+       SEARCH_KW="${ARG#search }"      # everything after the literal "search " prefix
        ;;
      "--since "*)
        echo "(--since diff mode — coming in slice S7)"
