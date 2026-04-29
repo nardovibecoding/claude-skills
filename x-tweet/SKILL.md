@@ -38,8 +38,8 @@ Every draft passes through content-humanizer between Generate (step 3) and Anti-
 1. **Calendar check** — read [content-calendar.md](references/content-calendar.md), suggest today's type
 2. **Arc + angle selection** — pick narrative structure from [arc-types.md](references/arc-types.md), layer a framing lens from [angle-bank.md](references/angle-bank.md)
 3. **Generate** — apply [voice-rules.md](references/voice-rules.md) and [templates.md](references/templates.md)
-3. **Humanizer pass** — run content-humanizer, remove all AI patterns
-4. **Anti-pattern check** — scan against [anti-patterns.md](references/anti-patterns.md)
+4. **Humanizer pass (MANDATORY)** — run content-humanizer, remove all AI patterns. Stamp `humanized: true` on draft. Posting blocked without this stamp.
+5. **Anti-pattern check** — scan against [anti-patterns.md](references/anti-patterns.md)
 5. **Hashtag** — read [hashtag-strategy.md](references/hashtag-strategy.md), search X for trending tags, pick 1-2
 6. **Time check** — warn if outside peak windows (see [engagement-data.md](references/engagement-data.md))
 7. **Screenshot safety** — if image attached, scan for paths/keys/IPs/chat IDs before posting
