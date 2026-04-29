@@ -504,7 +504,7 @@ def _parse_bug_args(argv: list[str]) -> dict:
     return flags
 
 
-def _bug_step(n: int, name: str, msg: str) -> None:
+def _bug_step(n: int | float, name: str, msg: str) -> None:
     print(f"step {n} {name} | {msg}")
 
 
