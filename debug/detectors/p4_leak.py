@@ -5,10 +5,26 @@ import time
 
 from ._shell import run_on
 
-RSS_WARN_KB = 500_000     # 500 MB
-RSS_CRIT_KB = 1_500_000   # 1.5 GB
-DELTA_WARN_KB = 50_000    # 50 MB grew in 30s == ~100 MB/min
-DELTA_CRIT_KB = 200_000
+# Per-host RSS thresholds. Mac dev workstation runs Chrome / Claude Code / Xcode
+# routinely 10-20 GB collectively; lean VPS hosts run 200-800 MB total.
+# Mirrors NardoWorld/scripts/bigd/performance/detectors/host_metrics.py.
+RSS_THRESHOLDS_KB = {
+    "mac":    {"warn": 8_000_000,  "crit": 16_000_000},
+    "local":  {"warn": 8_000_000,  "crit": 16_000_000},
+    "hel":    {"warn": 800_000,    "crit": 1_500_000},
+    "london": {"warn": 800_000,    "crit": 1_500_000},
+}
+_DEFAULT_RSS = {"warn": 1_500_000, "crit": 4_000_000}
+
+# Delta thresholds: 30s growth that suggests a real leak vs. noise.
+# A 50 MB jump in 30s on Mac is normal (browser tab loading); on VPS it's a smoke alarm.
+DELTA_THRESHOLDS_KB = {
+    "mac":    {"warn": 200_000, "crit": 500_000},
+    "local":  {"warn": 200_000, "crit": 500_000},
+    "hel":    {"warn": 30_000,  "crit": 100_000},
+    "london": {"warn": 30_000,  "crit": 100_000},
+}
+_DEFAULT_DELTA = {"warn": 50_000, "crit": 200_000}
 
 
 def _sample(host: str) -> dict[str, int]:
