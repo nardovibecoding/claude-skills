@@ -46,7 +46,7 @@ If prompt names a register, load `registers/<name>.md`. Registers commit to a *c
 
 Triggers: "startup-techy", "luxury-editorial", "academic", "consumer-playful", "enterprise-trust", "underground-zine", "civic-formal", "craft-artisan", "cyber-streetwear".
 
-### 4. Archetype (12 layout shapes)
+### 5. Archetype (12 layout shapes)
 
 If prompt names a layout type, load `archetypes/<name>.md`. Triggers: "dashboard", "hero", "pricing", "deck/slides", "chart", "table", "glassmorphism / glass", "calendar", "chat ui", "footer", "landing", "popup".
 
