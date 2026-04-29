@@ -107,6 +107,17 @@ _ACTION_SUBJECT_RE = re.compile(
     r"|reply needed|important|critical)\b"
 )
 
+# L2: action / question patterns in BODY (first 400 chars). Catches casual asks
+# that don't surface in subject ("Re: thread" + "do you want to try it out?" body).
+# Conservative — explicit question/ask verbs only, not bare "?" (too noisy).
+_ACTION_BODY_RE = re.compile(
+    r"(?i)(?:let me know|do you (?:want|need|have|know|think)"
+    r"|can you|could you|would you"
+    r"|please (?:reply|let me know|review|sign|confirm|send|share|advise|respond|check)"
+    r"|any update|when can|what time|waiting on|need your"
+    r"|get back to me|hear (?:back )?from you|response would be|reply by)"
+)
+
 # L3: receipt / order confirmation subject keywords.
 _RECEIPT_RE = re.compile(
     r"(?i)\b(receipt|order #?\w+|order confirmation|invoice"
