@@ -64,6 +64,13 @@ GMAIL_QUERY = (
 BODY_MAX_BYTES = 2048
 TRUNCATED_MARKER = "\n\n[truncated]"
 
+# Gmail label name applied to processed emails (Slice 2). Non-destructive:
+# email's UNREAD state is preserved. Re-fetch suppression via -label:memo-processed
+# in GMAIL_QUERY. Module-level cache keyed by label name → Gmail label id;
+# survives across calls within one process invocation.
+MEMO_PROCESSED_LABEL = "memo-processed"
+_LABEL_ID_CACHE: dict[str, str] = {}
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s email_poller %(levelname)s %(message)s",
