@@ -18,6 +18,9 @@ produces: "Published tweet on @nardovibecoding with engagement-optimized voice, 
 
 Generate and post tweets for @nardovibecoding. All tweets go through voice rules + humanizer before posting.
 
+## Humanizer phase (HARD RULE — no skip)
+Every draft passes through content-humanizer between Generate (step 3) and Anti-pattern check (step 4). Non-negotiable. Phase-close requires the draft to carry `humanized: true` metadata before posting. If the user requests "post this exact text", run humanizer once, show diff, ask for approval — never bypass entirely. Source: humanizer was step 3 in flow but unenforced; promoted to gated phase 2026-04-30 so we don't forget.
+
 ## Modes
 
 | Command | What it does |
