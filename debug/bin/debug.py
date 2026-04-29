@@ -1288,6 +1288,45 @@ def cmd_performance(argv: list[str]) -> int:
     baseline_path.write_text(baseline_md)
     _bug_step(1, "REPRODUCE", f"baseline captured ({len(metrics)} metrics) → {baseline_path}")
 
+    # Step 1.1 INVENTORY — P1-P4 detector pack (symptom-first).
+    # Resolves the host: explicit "host:feature" target wins; else if feature
+    # itself is a known host alias (mac/hel/london/local), use that; else local.
+    detector_host = host or (feature if feature in {"mac", "hel", "london", "local"} else "local")
+    detector_results = []
+    if dry:
+        _bug_step(1.1, "INVENTORY", f"--dry-run: P1-P4 detectors skipped (host={detector_host})")
+    elif _perf_run_detectors is None:
+        _bug_step(1.1, "INVENTORY", f"detector pack import failed: {_PERF_IMPORT_ERR}")
+    else:
+        try:
+            detector_results = _perf_run_detectors(detector_host)
+        except Exception as e:
+            detector_results = []
+            _bug_step(1.1, "INVENTORY", f"detector run crashed: {type(e).__name__}: {e}")
+        for r in detector_results:
+            label = r.get("detector", "p?")
+            findings_path = exp_dir / f"{label}.md"
+            md = [f"# Detector {label} — host={r.get('host')}",
+                  f"verdict: **{r.get('verdict','?')}**",
+                  f"summary: {r.get('summary','')}",
+                  "",
+                  f"evidence_cmd: `{r.get('evidence_cmd','')}`",
+                  ""]
+            findings = r.get("findings", []) or []
+            md.append(f"findings: {len(findings)}")
+            md.append("")
+            for f in findings[:20]:
+                md.append(f"- {json.dumps(f, default=str)}")
+            findings_path.write_text("\n".join(md) + "\n")
+        worst = "ok"
+        order = {"ok": 0, "warn": 1, "error": 2, "crit": 3}
+        for r in detector_results:
+            v = r.get("verdict", "ok")
+            if order.get(v, 0) > order.get(worst, 0):
+                worst = v
+        summary_line = ", ".join(f"{r.get('detector','p?')}={r.get('verdict','?')}" for r in detector_results)
+        _bug_step(1.1, "INVENTORY", f"P1-P4 host={detector_host} worst={worst} ({summary_line})")
+
     # Step 1.5 MINIMISE (pocock/skills diagnose — performance variant)
     workload_min = exp_dir / "workload-min.sh"
     minimise_log = state_dir / "minimise-log.md"
