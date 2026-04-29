@@ -101,7 +101,7 @@ def _extract_recipients(service, msgid: str) -> list[str]:
         if h.get("name", "").lower() in ("to", "cc"):
             raw.append(h.get("value", ""))
     out: list[str] = []
-    for addr_name, addr in getaddresses(raw):
+    for _, addr in getaddresses(raw):
         addr = (addr or "").strip().lower()
         if "@" in addr:
             out.append(addr)
