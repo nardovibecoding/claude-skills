@@ -68,7 +68,7 @@ if [ "$ARG" = "--status" ]; then
 fi
 
 # --since N: diff mode. Show NEW / RECURRING / RESOLVED across last N days.
-# Use when you skipped /bigd for a few days and want "what changed".
+# Use when you skipped /daemons for a few days and want "what changed".
 if [ "$ARG" = "--since" ]; then
   DAYS="${2:-7}"
   python3 ~/.claude/skills/bigd/scripts/since_diff.py "$DAYS"
