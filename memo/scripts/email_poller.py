@@ -478,8 +478,8 @@ def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description="memo-v2 email channel poller")
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--auth", action="store_true", help="run one-time browser OAuth flow")
-    g.add_argument("--poll", action="store_true", help="fetch unread, write, mark read")
-    g.add_argument("--dry-run", action="store_true", help="like --poll but no writes/no mark-read")
+    g.add_argument("--poll", action="store_true", help="fetch unread, write, apply memo-processed label")
+    g.add_argument("--dry-run", action="store_true", help="like --poll but no writes/no label-apply")
     args = p.parse_args(argv)
 
     if args.auth:
