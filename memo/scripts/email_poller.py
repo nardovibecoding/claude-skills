@@ -448,7 +448,7 @@ def _classify(parsed: dict) -> tuple[str, str]:
     # L3: auto-noise
     if subject and _RECEIPT_RE.search(subject):
         return ("suppress", "L3: receipt")
-    if body and _OTP_RE.search(body):
+    if body and _OTP_DIGITS_RE.search(body) and _OTP_VERB_RE.search(body):
         return ("suppress", "L3: OTP")
     if domain == "calendar-notification.google.com" and "Invitation:" in subject:
         return ("suppress", "L3: calendar auto-confirm")
