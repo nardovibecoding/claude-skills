@@ -968,8 +968,52 @@ def _parse_kv_args(argv: list[str], known_flags: dict) -> tuple[dict, list[str]]
                 flags["runs"] = int(a.split("=", 1)[1])
             except ValueError:
                 flags["runs"] = 10
+        elif a.startswith("--threshold="):
+            try:
+                flags["threshold"] = float(a.split("=", 1)[1])
+            except ValueError:
+                flags["threshold"] = 0.5
         elif a.startswith("--bug-slug="):
             flags["bug_slug"] = a.split("=", 1)[1]
+        elif a.startswith("--target="):
+            flags["minimise_target"] = a.split("=", 1)[1]
+        elif a.startswith("--fingerprint=exit:"):
+            try:
+                flags["fingerprint_exit"] = int(a.split(":", 1)[1])
+            except ValueError:
+                pass
+        elif a.startswith("--fingerprint-stderr="):
+            flags["fingerprint_stderr"] = a.split("=", 1)[1]
+        elif a.startswith("--fingerprint-stdout="):
+            flags["fingerprint_stdout"] = a.split("=", 1)[1]
+        elif a.startswith("--reset-cmd="):
+            flags["reset_cmd"] = a.split("=", 1)[1]
+        elif a.startswith("--max-probes="):
+            try:
+                flags["max_probes"] = int(a.split("=", 1)[1])
+            except ValueError:
+                flags["max_probes"] = 100
+        elif a.startswith("--strip-glob="):
+            flags["strip_glob"] = a.split("=", 1)[1]
+        elif a.startswith("--strip-env="):
+            flags["strip_env"] = a.split("=", 1)[1]
+        elif a.startswith("--baseline-ms="):
+            try:
+                flags["baseline_ms"] = int(a.split("=", 1)[1])
+            except ValueError:
+                pass
+        elif a.startswith("--workload-axis="):
+            flags["workload_axis"] = a.split("=", 1)[1]
+        elif a.startswith("--workload-low="):
+            try:
+                flags["workload_low"] = int(a.split("=", 1)[1])
+            except ValueError:
+                pass
+        elif a.startswith("--workload-high="):
+            try:
+                flags["workload_high"] = int(a.split("=", 1)[1])
+            except ValueError:
+                pass
         elif a.startswith("--") and "=" in a:
             # Generic --key=value passthrough (e.g. --host=mac). Normalise
             # dashes to underscores for the flags dict key.
