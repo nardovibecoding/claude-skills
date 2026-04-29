@@ -64,7 +64,6 @@ class TestDdminCore(unittest.TestCase):
 class TestFingerprint(unittest.TestCase):
 
     def test_exit_code_match(self):
-        from _lib.minimise import ProbeResult
         fp = Fingerprint(exit_code=1)
         self.assertTrue(fp.match(ProbeResult(exit=1, stdout="", stderr="", wall_ms=0)))
         self.assertFalse(fp.match(ProbeResult(exit=0, stdout="", stderr="", wall_ms=0)))
