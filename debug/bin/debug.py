@@ -1277,6 +1277,37 @@ def cmd_performance(argv: list[str]) -> int:
     baseline_path.write_text(baseline_md)
     _bug_step(1, "REPRODUCE", f"baseline captured ({len(metrics)} metrics) → {baseline_path}")
 
+    # Step 1.5 MINIMISE (pocock/skills diagnose — performance variant)
+    workload_min = exp_dir / "workload-min.sh"
+    minimise_log = state_dir / "minimise-log.md"
+    if dry:
+        workload_min.write_text("#!/usr/bin/env bash\n# dry-run: minimise skipped\nexit 0\n")
+        minimise_log.write_text(f"# minimise log (performance) — {target}\n\ndry-run\n")
+        _bug_step(1.5, "MINIMISE", "--dry-run: skipped minimise")
+    else:
+        if not workload_min.exists():
+            workload_min.write_text(
+                "#!/usr/bin/env bash\n"
+                "# Minimised perf workload — start as a copy of the production load that exhibits the regression.\n"
+                "# Strategy: shrink request volume / payload size / concurrency / dataset rows one at a time;\n"
+                "# re-capture metrics after each shrink; KEEP the shrink if the offending metric still busts budget,\n"
+                "# REVERT if budget recovers.\n"
+                "# Halt when no further shrink leaves the budget bust intact.\n"
+                "exit 0\n"
+            )
+        os.chmod(workload_min, 0o755)
+        if not minimise_log.exists():
+            minimise_log.write_text(
+                f"# Minimise log (performance) — {target}\n\n"
+                "Identify the load-bearing axis: one metric in the baseline is over budget.\n"
+                "Shrink the workload until ONLY that metric still busts budget — that isolates the cause.\n\n"
+                "| # | Shrunk | Offending metric | Still over budget? | Decision |\n"
+                "|---|---|---|---|---|\n"
+                "| 1 | <e.g. concurrent requests 100 → 10> | mem_growth_1h_pct | yes | keep shrunk |\n"
+                "| 2 | <e.g. payload 10KB → 1KB> | fill_latency_p99 | no | reverted (size matters) |\n"
+            )
+        _bug_step(1.5, "MINIMISE", f"perf-minimise template at {workload_min} + log at {minimise_log}")
+
     # Step 2-4 BUILD/EXEC/DEP
     p4 = None
     try:
