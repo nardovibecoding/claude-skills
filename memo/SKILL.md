@@ -17,7 +17,7 @@ Inspect `$ARG` (the verb argument after `/memo`):
 
 - empty → **list mode** (5 newest, both pending+done)
 - starts with `#` → **tag-filter mode** (S2)
-- starts with `search ` → **search mode** (coming in S3)
+- equals `search` or starts with `search ` → **search mode** (S3 — full-text body substring)
 - starts with `--since ` → **diff mode** (coming in S7)
 - anything else → **scribble mode** (S4 — write a terminal memo, parse #tag tokens out of body)
 
