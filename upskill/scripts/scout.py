@@ -79,6 +79,11 @@ def chunked(lst: list, n: int) -> list[list]:
     return [lst[i : i + n] for i in range(0, len(lst), n)]
 
 
+def quote_kw(k: str) -> str:
+    """Quote multi-word keywords for gh search OR queries."""
+    return f'"{k}"' if " " in k else k
+
+
 def match_keywords(text: str, keywords: list[str]) -> list[str]:
     """Case-insensitive substring match of keywords against text."""
     low = (text or "").lower()
