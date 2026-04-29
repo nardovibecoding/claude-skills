@@ -46,10 +46,17 @@ CLIENT_SECRETS_PATH = _HERE / ".gmail_client_secrets.json"
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 
 # Sender allowlist per Q-B (LOCKED 01-spec.md §11)
+# DEPRECATED: removed in Slice 3 when classifier replaces sender allowlist
 ALLOWED_SENDERS = frozenset(["bernard.ngb@gmail.com"])
 
-# Gmail query — fetched every poll
-GMAIL_QUERY = "is:unread from:bernard.ngb@gmail.com subject:MEMO"
+# Gmail query — inbox-triage (Slice 1 rebuild). Gmail-side category suppress
+# + label-based idempotency (label-add lands Slice 2). Pass-through classifier
+# this slice; L1-L4 layering arrives Slice 3.
+GMAIL_QUERY = (
+    "is:unread newer_than:1d "
+    "-category:promotions -category:social -category:updates -category:forums "
+    "-label:memo-processed"
+)
 
 # Body truncation cap (2KB per spec §4.2)
 BODY_MAX_BYTES = 2048
