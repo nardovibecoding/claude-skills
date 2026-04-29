@@ -1664,13 +1664,34 @@ def cmd_performance(argv: list[str]) -> int:
         summary_line = ", ".join(f"{r.get('detector','p?')}={r.get('verdict','?')}" for r in detector_results)
         _bug_step(1.1, "INVENTORY", f"P1-P4 host={detector_host} worst={worst} ({summary_line})")
 
-    # Step 1.5 MINIMISE (pocock/skills diagnose — performance variant)
+    # Step 1.5 MINIMISE (1D bsearch on workload axis; opt-in via --auto-minimise)
     workload_min = exp_dir / "workload-min.sh"
     minimise_log = state_dir / "minimise-log.md"
     if dry:
         workload_min.write_text("#!/usr/bin/env bash\n# dry-run: minimise skipped\nexit 0\n")
         minimise_log.write_text(f"# minimise log (performance) — {target}\n\ndry-run\n")
         _bug_step(1.5, "MINIMISE", "--dry-run: skipped minimise")
+    elif flags.get("auto_minimise"):
+        repro = exp_dir / "repro.sh"
+        if not repro.exists():
+            repro.write_text(
+                "#!/usr/bin/env bash\n"
+                "# fill in: workload size as $1 (or via env var named in --workload-axis)\n"
+                "# script must run the perf-sensitive code at the requested size and exit when done\n"
+                "exit 0\n"
+            )
+            os.chmod(repro, 0o755)
+        ok, summary = _run_auto_minimise_perf(
+            repro_path=repro,
+            repro_min_path=workload_min,
+            log_path=minimise_log,
+            flags=flags,
+            header_label=f"Minimise log (performance) — {target}",
+        )
+        if ok:
+            _bug_step(1.5, "MINIMISE", f"auto-minimise (perf) OK — {summary} — out: {workload_min}, log: {minimise_log}")
+        else:
+            _bug_step(1.5, "MINIMISE", f"auto-minimise (perf) FAILED — see {minimise_log}")
     else:
         if not workload_min.exists():
             workload_min.write_text(
@@ -1680,6 +1701,7 @@ def cmd_performance(argv: list[str]) -> int:
                 "# re-capture metrics after each shrink; KEEP the shrink if the offending metric still busts budget,\n"
                 "# REVERT if budget recovers.\n"
                 "# Halt when no further shrink leaves the budget bust intact.\n"
+                "# Or: pass --auto-minimise --baseline-ms=N --workload-axis=<arg> --workload-low=1 --workload-high=1000.\n"
                 "exit 0\n"
             )
         os.chmod(workload_min, 0o755)
@@ -1693,7 +1715,7 @@ def cmd_performance(argv: list[str]) -> int:
                 "| 1 | <e.g. concurrent requests 100 → 10> | mem_growth_1h_pct | yes | keep shrunk |\n"
                 "| 2 | <e.g. payload 10KB → 1KB> | fill_latency_p99 | no | reverted (size matters) |\n"
             )
-        _bug_step(1.5, "MINIMISE", f"perf-minimise template at {workload_min} + log at {minimise_log}")
+        _bug_step(1.5, "MINIMISE", f"perf-minimise template at {workload_min} + log at {minimise_log} — or use --auto-minimise")
 
     # Step 2-4 BUILD/EXEC/DEP
     p4 = None
