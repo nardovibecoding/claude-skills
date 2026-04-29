@@ -176,7 +176,7 @@ def apply_overlay(scored: dict, lens: dict, *, top_n: int, date: str,
             out["overlay_sources_missing"].append(f"{src}:not_implemented")
             continue
         payload = _invoke_reader(READER_MAP[src], date)
-        if not _has_data(src, payload):
+        if payload is None or not _has_data(src, payload):
             out["overlay_sources_missing"].append(src)
             continue
         payloads[src] = payload
