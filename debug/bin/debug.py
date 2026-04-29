@@ -928,7 +928,7 @@ fresh evidence: n/a
 # Bare boolean flags allowed in `--<name>` form (no `=`). Anything else
 # arriving as bare `--unknown` raises a clear error so silent typos like
 # `--dry_run` (S6 root cause) cannot fall through to a real production write.
-_BOOL_FLAG_ALLOWLIST = {"dry_run", "verbose", "force"}
+_BOOL_FLAG_ALLOWLIST = {"dry_run", "verbose", "force", "auto_minimise"}
 
 
 def _parse_kv_args(argv: list[str], known_flags: dict) -> tuple[dict, list[str]]:
