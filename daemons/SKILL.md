@@ -57,7 +57,7 @@ hosts_present() {
   ls "$PEND" 2>/dev/null | sed -E 's/.*_([a-z]+)\.json/\1/' | sort -u | tr '\n' ' '
 }
 
-echo "=== /bigd | DATE=$DATE | mode=${ARG:-smart} ==="
+echo "=== /daemons | DATE=$DATE | mode=${ARG:-smart} ==="
 
 # --status: report only, no work
 if [ "$ARG" = "--status" ]; then
