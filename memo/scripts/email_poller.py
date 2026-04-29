@@ -436,8 +436,9 @@ def _classify(parsed: dict) -> tuple[str, str]:
     if subject and _PROMO_SUBJECT_RE.search(subject):
         return ("suppress", "L1: promo subject")
 
-    # L2: hard-surface (overrides L3+L4)
-    emails, domains = _load_allowlist()
+    # L2: hard-surface (overrides L3+L4). Module-attr lookup so tests can
+    # monkeypatch ep.ALLOWLIST_PATH without re-binding the function default.
+    emails, domains = _load_allowlist(ALLOWLIST_PATH)
     if sender and sender in emails:
         return ("surface", f"L2: allowlist email {sender}")
     if domain and domain in domains:
