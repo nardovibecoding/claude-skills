@@ -1,0 +1,19 @@
+# v2 ships static keywords; v3 to dynamically read CLAUDE.md headers
+# + ~/NardoWorld/realize-debt.md
+name: gaps
+keywords:
+  - lint
+  - memory sync
+  - skill audit
+  - cleanup
+  - stale
+  - freshness
+  - dead code
+gh_topics: [lint, audit]
+scoring_weights:
+  stars: 0.3
+  recency: 0.2
+  keyword_fit: 0.4
+  language_match: 0.1
+integration_cost_model: skills
+overlay_sources: [bigd-gaps]
