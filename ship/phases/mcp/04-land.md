@@ -92,6 +92,12 @@ The README's tool listing must match the server's actual `tools/list` output. Sh
 
 `strict-execute` writes; `strict-review` re-verifies at T+24h (MCP servers can stop responding after long idle).
 
+## Production Orphan / Zombie Check (when server ssh-fans-out or forks workers)
+
+If the MCP server's tools ssh into remote hosts or fork worker processes, load `phases/common/production-orphan-check.md` and run OC-1 + OC-2 against each host the server touches after the test-tool call (Step 4). Disconnected mid-stream sessions are exactly the leak shape this catches.
+
+Skip when the server is purely local + stateless (no fork, no ssh). Document the skip reason in `experiments/orphan-check.md`.
+
 ## SPREAD/SHRINK
 
 Standard per `phases/common/refresh.md`.
