@@ -28,6 +28,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import _disc  # noqa: E402
 
+# Detector pack (P1-P4) for /debug performance symptom-first inventory.
+# Loaded lazily so a detector import error never bricks other verbs.
+sys.path.insert(0, str(Path(__file__).parent.parent))
+try:
+    from detectors import run_all as _perf_run_detectors  # type: ignore
+except Exception as _e:  # pragma: no cover - defensive
+    _perf_run_detectors = None
+    _PERF_IMPORT_ERR = repr(_e)
+else:
+    _PERF_IMPORT_ERR = None
+
 HOME = Path(os.path.expanduser("~"))
 META = HOME / "NardoWorld" / "meta"
 LEDGER = HOME / "NardoWorld" / "realize-debt.md"
