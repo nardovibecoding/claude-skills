@@ -54,6 +54,34 @@ The result tells you which axis the regression depends on — that drives Step 6
 
 ---
 
+## Step 1.1 INVENTORY — P1-P4 detector pack (shipped 2026-04-29)
+
+Symptom-first inventory. When user types `/debug performance <host>`,
+`cmd_performance` fires four detectors via `~/.claude/skills/debug/detectors/run_all`.
+Replaces the planned standalone `/debug zombie` and `/debug orphan` verbs — now
+they're detectors INSIDE performance, surfaced when user reports a host symptom.
+
+| detector | what it scans | thresholds (mac / hel-london) |
+|---|---|---|
+| **P1 zombie** | `ps STAT == 'Z'` count | warn ≥10 / ≥1, crit ≥30 / ≥5 |
+| **P2 orphan** | `PPID==1 && (defunct OR git-pack pattern)` | warn ≥1 suspicious, crit ≥5 |
+| **P3 hot-loop** | sustained `pcpu` over 2 samples 3s apart | warn ≥5 procs ≥5% / ≥1, crit ≥3 procs ≥50% / ≥1 |
+| **P4 leak** | top-20 RSS + 30s delta | warn ≥8GB-RSS / ≥800MB, crit ≥16GB / ≥1.5GB |
+
+Each detector writes `<perf_slug>/experiments/p<N>-<name>.md` with verdict, summary,
+evidence_cmd, and up to 20 findings. Verdicts feed Step 10 CLASSIFY: any `crit` or
+`warn` overrides `inconclusive` and emits `regression`.
+
+P2 was sized for the 2026-04-29 London `git index-pack` orphan incident (32 PPID=1
+git-pack procs from sshd disconnect-mid-push). Suspicious pattern list:
+`git index-pack`, `git receive-pack`, `git upload-pack`, `<defunct>`.
+
+Host alias resolves from the verb argument: `/debug performance mac|hel|london|local`
+treats the bare alias as `detector_host`. `/debug performance hel:kalshi-bot` takes
+host from prefix and feature from suffix (existing parse_target shape).
+
+---
+
 ## Step 8 INSTRUMENT — perf marker pattern
 
 `[DEBUG H1]` tagged log lines wrapped in `#region DEBUG ... #endregion` reversible blocks; sink → `~/.claude/debug.log`. Step 14 CLEANUP strips on close.
