@@ -338,7 +338,7 @@ def main() -> int:
         for group in groups:
             if not group:
                 continue
-            query = " OR ".join(group)
+            query = " OR ".join(quote_kw(k) for k in group)
             rc, rows, err = gh_search_repos(query, args.verbose)
             out["calls_made"] += 1
             src = f"keywords:{','.join(group)[:60]}"
