@@ -114,10 +114,10 @@ _RECEIPT_RE = re.compile(
     r"|thanks for (?:your )?(?:order|purchase|subscription))\b"
 )
 
-# L3: OTP / 2FA verification body pattern (6-digit code + verify keyword).
-_OTP_RE = re.compile(
-    r"(?i)\b\d{6}\b.*(?:verif|confirm|code|token|2fa|two.factor)"
-)
+# L3: OTP / 2FA verification body pattern (6-digit code AND verify keyword,
+# either order). Two re.search calls cheaper than one alternation backtrack.
+_OTP_DIGITS_RE = re.compile(r"\b\d{6}\b")
+_OTP_VERB_RE = re.compile(r"(?i)(?:verif|confirm|2fa|two.factor|one.time (?:code|password)|otp\b|security code|access code)")
 
 logging.basicConfig(
     level=logging.INFO,
