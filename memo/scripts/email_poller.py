@@ -350,6 +350,109 @@ def _get_or_create_label(service, label_name: str = MEMO_PROCESSED_LABEL) -> str
     return label_id
 
 
+# ───────────────────────── Classifier (Slice 3 — 4-layer, FROZEN) ─────────────────────────
+
+def _load_allowlist(path: Path = ALLOWLIST_PATH) -> tuple[frozenset[str], frozenset[str]]:
+    """Return (emails, domains) read from `path`. mtime-cached.
+
+    Format: one entry per line. `@example.com` -> domain. `foo@bar.com` -> email.
+    `#` starts a comment. Blank lines + comment lines ignored. Malformed lines
+    (no `@` at all) are logged and skipped (never crash). On mtime change vs
+    cached value, file is re-read; otherwise returns cached frozensets.
+    Missing file -> empty sets (default-suppress for unknown senders is fine
+    given L4 default).
+    """
+    try:
+        mtime = path.stat().st_mtime
+    except FileNotFoundError:
+        # File absent -> empty allowlist; refresh cache so we don't re-stat next call
+        if _ALLOWLIST_CACHE.get("mtime") != -1.0:
+            _ALLOWLIST_CACHE["mtime"] = -1.0
+            _ALLOWLIST_CACHE["emails"] = frozenset()
+            _ALLOWLIST_CACHE["domains"] = frozenset()
+            log.warning("allowlist file absent at %s — using empty allowlist", path)
+        return _ALLOWLIST_CACHE["emails"], _ALLOWLIST_CACHE["domains"]
+
+    if mtime == _ALLOWLIST_CACHE.get("mtime"):
+        return _ALLOWLIST_CACHE["emails"], _ALLOWLIST_CACHE["domains"]
+
+    emails: set[str] = set()
+    domains: set[str] = set()
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except Exception as e:
+        log.error("allowlist read failed for %s: %s", path, e)
+        return _ALLOWLIST_CACHE["emails"], _ALLOWLIST_CACHE["domains"]
+
+    for lineno, line in enumerate(raw.splitlines(), 1):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if s.startswith("@"):
+            dom = s[1:].lower()
+            if "@" in dom or "." not in dom:
+                log.warning("allowlist line %d malformed domain %r — skipped", lineno, s)
+                continue
+            domains.add(dom)
+        elif "@" in s:
+            emails.add(s.lower())
+        else:
+            log.warning("allowlist line %d malformed (no '@') %r — skipped", lineno, s)
+
+    _ALLOWLIST_CACHE["mtime"] = mtime
+    _ALLOWLIST_CACHE["emails"] = frozenset(emails)
+    _ALLOWLIST_CACHE["domains"] = frozenset(domains)
+    log.info(
+        "allowlist loaded from %s: %d emails, %d domains",
+        path.name, len(emails), len(domains),
+    )
+    return _ALLOWLIST_CACHE["emails"], _ALLOWLIST_CACHE["domains"]
+
+
+def _classify(parsed: dict) -> tuple[str, str]:
+    """Return (verdict, reason) where verdict ∈ {'surface', 'suppress'}.
+
+    4-layer evaluation in order: L1 hard-suppress -> L2 hard-surface ->
+    L3 auto-noise -> L4 default-suppress. L2 BEATS L3 (allowlist sender with
+    'Receipt' subject still surfaces). Reasons are human-readable strings
+    suitable for log output + per-layer counters.
+    """
+    sender = parsed.get("from_addr", "") or ""
+    subject = parsed.get("subject", "") or ""
+    body = parsed.get("body_raw", "") or ""
+    headers = parsed.get("headers", []) or []
+    domain = sender.split("@", 1)[1].lower() if "@" in sender else ""
+
+    # L1: hard-suppress
+    for h in headers:
+        if h.get("name", "").lower() == "list-unsubscribe":
+            return ("suppress", "L1: list-unsubscribe header")
+    if domain and _SUPPRESS_DOMAIN_RE.search(domain):
+        return ("suppress", f"L1: bulk-mail platform {domain}")
+    if subject and _PROMO_SUBJECT_RE.search(subject):
+        return ("suppress", "L1: promo subject")
+
+    # L2: hard-surface (overrides L3+L4)
+    emails, domains = _load_allowlist()
+    if sender and sender in emails:
+        return ("surface", f"L2: allowlist email {sender}")
+    if domain and domain in domains:
+        return ("surface", f"L2: allowlist domain @{domain}")
+    if subject and _ACTION_SUBJECT_RE.search(subject):
+        return ("surface", "L2: action keyword")
+
+    # L3: auto-noise
+    if subject and _RECEIPT_RE.search(subject):
+        return ("suppress", "L3: receipt")
+    if body and _OTP_RE.search(body):
+        return ("suppress", "L3: OTP")
+    if domain == "calendar-notification.google.com" and "Invitation:" in subject:
+        return ("suppress", "L3: calendar auto-confirm")
+
+    # L4: default-suppress (conservative — avoid memo flood for unknown senders)
+    return ("suppress", "L4: no rule fired (default-suppress)")
+
+
 def _run_auth_flow() -> int:
     """One-time browser OAuth flow. Saves refresh token to TOKEN_PATH."""
     try:
