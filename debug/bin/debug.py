@@ -498,7 +498,12 @@ def _slugify(s: str) -> str:
 
 def _parse_bug_args(argv: list[str]) -> dict:
     """Extract symptom + flags. argv excludes argv[0] script + 'bug' verb."""
-    flags = {"quick": False, "no_chain": False, "dry_run": False, "bug_slug": None}
+    flags = {
+        "quick": False, "no_chain": False, "dry_run": False, "bug_slug": None,
+        "auto_minimise": False, "minimise_target": "lines",
+        "fingerprint_exit": None, "fingerprint_stderr": None, "fingerprint_stdout": None,
+        "reset_cmd": None, "max_probes": 100, "strip_glob": None, "strip_env": None,
+    }
     symptom_parts = []
     for a in argv:
         if a == "--quick":
@@ -507,8 +512,26 @@ def _parse_bug_args(argv: list[str]) -> dict:
             flags["no_chain"] = True
         elif a == "--dry-run":
             flags["dry_run"] = True
+        elif a == "--auto-minimise":
+            flags["auto_minimise"] = True
         elif a.startswith("--bug-slug="):
             flags["bug_slug"] = a.split("=", 1)[1]
+        elif a.startswith("--target="):
+            flags["minimise_target"] = a.split("=", 1)[1]
+        elif a.startswith("--fingerprint=exit:"):
+            flags["fingerprint_exit"] = int(a.split(":", 1)[1])
+        elif a.startswith("--fingerprint-stderr="):
+            flags["fingerprint_stderr"] = a.split("=", 1)[1]
+        elif a.startswith("--fingerprint-stdout="):
+            flags["fingerprint_stdout"] = a.split("=", 1)[1]
+        elif a.startswith("--reset-cmd="):
+            flags["reset_cmd"] = a.split("=", 1)[1]
+        elif a.startswith("--max-probes="):
+            flags["max_probes"] = int(a.split("=", 1)[1])
+        elif a.startswith("--strip-glob="):
+            flags["strip_glob"] = a.split("=", 1)[1]
+        elif a.startswith("--strip-env="):
+            flags["strip_env"] = a.split("=", 1)[1]
         else:
             symptom_parts.append(a)
     flags["symptom"] = " ".join(symptom_parts).strip()
