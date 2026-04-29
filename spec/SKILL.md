@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Render a ship-audit spec in plain English. Bare /spec lists recent ship slugs; /spec <slug> shows that slug's spec as 6-15 layman bullets; /spec <slug> --audit appends audit verdict. Triggers - /spec, "show me the spec for X", "what's the spec for X", "spec summary X".
+description: Render the current conversation's ship spec in plain English. Bare /spec shows the most-recent spec (the one you just shipped/audited). /spec <slug> targets a specific past spec. /spec --audit appends audit verdict. Triggers - /spec, "show me the spec", "what's the spec", "spec summary".
 user-invocable: true
 ---
 
@@ -10,22 +10,22 @@ Render a Phase 1 ship spec in plain English bullets. No jargon, no codes, no sca
 ## Step 1: Resolve target
 
 Parse args. Three modes:
-- bare `/spec` → list mode
-- `/spec <slug>` → render mode
-- `/spec <slug> --audit` → render + audit mode
+- bare `/spec` → render the **most-recent** spec (current conversation's)
+- `/spec <slug>` → render that specific slug's spec
+- `/spec [<slug>] --audit` → render + audit mode (slug optional; bare + --audit uses most-recent)
 
-## Step 2A: List mode (bare /spec)
+## Step 2A: Bare mode → resolve to most-recent spec
 
 ```bash
-ls -t ~/.ship/*/goals/01-spec.md 2>/dev/null | head -10 | while read f; do
-  slug=$(echo "$f" | sed -E 's|.*/\.ship/([^/]+)/goals/01-spec\.md|\1|')
-  scope=$(awk '/^## §0/{flag=1; next} /^## /{flag=0} flag && NF' "$f" | head -2 | tr '\n' ' ' | cut -c1-100)
-  mtime=$(stat -f '%Sm' -t '%Y-%m-%d' "$f")
-  echo "$mtime  $slug — $scope"
-done
+LATEST=$(ls -t ~/.ship/*/goals/01-spec.md 2>/dev/null | head -1)
+[ -z "$LATEST" ] && { echo "no ship specs found in ~/.ship/"; exit 0; }
+SLUG=$(echo "$LATEST" | sed -E 's|.*/\.ship/([^/]+)/goals/01-spec\.md|\1|')
+echo "Latest: $SLUG"
 ```
 
-Output as bullet list. Tell user: "Pick one with `/spec <slug>`."
+Then proceed to Step 2B render with that slug.
+
+If user wants a different one, they pass `/spec <slug>` explicitly. No list shown — keeps the output focused on the one spec they care about.
 
 ## Step 2B: Render mode (/spec <slug>)
 
