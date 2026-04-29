@@ -342,13 +342,12 @@ def main() -> int:
                     to_candidate(r, ordered + keywords_for_match, src)
                 )
     else:
-        for group in groups:
-            if not group:
+        for kw in kw_list:
+            if not kw:
                 continue
-            query = " OR ".join(quote_kw(k) for k in group)
-            rc, rows, err = gh_search_repos(query, args.verbose)
+            rc, rows, err = gh_search_repos(kw, args.verbose)
             out["calls_made"] += 1
-            src = f"keywords:{','.join(group)[:60]}"
+            src = f"keyword:{kw[:60]}"
             if rc != 0:
                 out["errors"].append({"source": src, "error": f"{rc}+{err}"})
                 out["scout_degraded"] = True
