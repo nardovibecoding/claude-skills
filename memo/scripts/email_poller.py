@@ -336,8 +336,19 @@ def _run_auth_flow() -> int:
 
 # ───────────────────────── Poll loop ─────────────────────────
 
-def _process_message(parsed: dict, *, dry_run: bool, service=None) -> str:
-    """Process one parsed message. Returns one-word verdict for log."""
+def _process_message(
+    parsed: dict,
+    *,
+    dry_run: bool,
+    service=None,
+    label_id: str = "",
+) -> str:
+    """Process one parsed message. Returns one-word verdict for log.
+
+    `label_id` (Slice 2) is the cached id of `memo-processed`; required when
+    `service is not None` (i.e. live mode). Applied via addLabelIds — this is
+    non-destructive (does NOT mark the email read).
+    """
     from_addr = parsed["from_addr"]
     subject = parsed["subject"]
     body_raw = parsed["body_raw"]
@@ -370,17 +381,22 @@ def _process_message(parsed: dict, *, dry_run: bool, service=None) -> str:
     )
     log.info("write: %s tags=%s from=%s", path.name, tags, from_addr)
 
-    # Mark as read by removing UNREAD label
+    # Apply non-destructive `memo-processed` label (Slice 2). Email's UNREAD
+    # state is preserved. Re-fetch suppressed via -label:memo-processed in
+    # GMAIL_QUERY on next poll.
     if service is not None:
+        if not label_id:
+            log.error("label-apply skipped for %s: missing label_id (caller bug)", msg_id)
+            return "write-but-not-labeled"
         try:
             service.users().messages().modify(
                 userId="me",
                 id=msg_id,
-                body={"removeLabelIds": ["UNREAD"]},
+                body={"addLabelIds": [label_id]},
             ).execute()
         except Exception as e:
-            log.error("mark-read failed for %s: %s", msg_id, e)
-            return "write-but-not-marked"
+            log.error("label-apply failed for %s: %s", msg_id, e)
+            return "write-but-not-labeled"
     return "write"
 
 
@@ -388,11 +404,22 @@ def _poll(*, dry_run: bool) -> int:
     creds = _load_credentials()
     service = _build_service(creds)
 
+    # Slice 2: ensure label exists once per poll. Fail loud + exit 1 if cannot
+    # ensure — without the label, dedup via -label:memo-processed cannot work
+    # and every poll would re-process the same emails.
+    label_id = ""
+    if not dry_run:
+        try:
+            label_id = _get_or_create_label(service, MEMO_PROCESSED_LABEL)
+        except Exception as e:
+            log.error("FATAL: cannot ensure %s label: %s", MEMO_PROCESSED_LABEL, e)
+            return 1
+
     resp = service.users().messages().list(userId="me", q=GMAIL_QUERY, maxResults=50).execute()
     msgs = resp.get("messages", []) or []
     log.info("poll: %d inbox candidates after Gmail-side suppress", len(msgs))
 
-    counts = {"write": 0, "dry-write": 0, "discard": 0, "write-but-not-marked": 0, "error": 0}
+    counts = {"write": 0, "dry-write": 0, "discard": 0, "write-but-not-labeled": 0, "error": 0}
     for stub in msgs:
         try:
             full = service.users().messages().get(
@@ -405,6 +432,7 @@ def _poll(*, dry_run: bool) -> int:
                 parsed,
                 dry_run=dry_run,
                 service=None if dry_run else service,
+                label_id=label_id,
             )
             counts[verdict] = counts.get(verdict, 0) + 1
         except Exception as e:
