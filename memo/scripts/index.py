@@ -132,7 +132,9 @@ def parse_memo(path: Path) -> dict[str, Any]:
         "from": fm.get("from", ""),
         "type": fm.get("type", ""),
         "tags": tags,
-        "status": fm.get("status", "pending" if path.parent.name == "pending" else "done"),
+        # Directory is ground truth: TG bot writes status:pending and never
+        # updates on archive. Trust parent dir over stale frontmatter.
+        "status": "pending" if path.parent.name == "pending" else "done",
         "channel": channel,
         "source": fm.get("source", ""),
         "body": body,
