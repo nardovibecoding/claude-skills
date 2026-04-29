@@ -74,7 +74,6 @@ class TestFingerprint(unittest.TestCase):
         self.assertFalse(fp.match(ProbeResult(exit=137, stdout="", stderr="something else", wall_ms=0)))
 
     def test_no_criteria_raises(self):
-        from _lib.minimise import ProbeResult
         fp = Fingerprint()
         with self.assertRaises(ValueError):
             fp.match(ProbeResult(exit=1, stdout="", stderr="", wall_ms=0))
