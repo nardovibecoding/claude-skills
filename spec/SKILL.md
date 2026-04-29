@@ -19,7 +19,7 @@ Parse args. Three modes:
 ```bash
 ls -t ~/.ship/*/goals/01-spec.md 2>/dev/null | head -10 | while read f; do
   slug=$(echo "$f" | sed -E 's|.*/\.ship/([^/]+)/goals/01-spec\.md|\1|')
-  scope=$(awk '/^## §0 SCOPE/{flag=1; next} /^## /{flag=0} flag && NF' "$f" | head -2 | tr '\n' ' ' | cut -c1-100)
+  scope=$(awk '/^## §0/{flag=1; next} /^## /{flag=0} flag && NF' "$f" | head -2 | tr '\n' ' ' | cut -c1-100)
   mtime=$(stat -f '%Sm' -t '%Y-%m-%d' "$f")
   echo "$mtime  $slug — $scope"
 done
