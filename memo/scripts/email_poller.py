@@ -455,7 +455,9 @@ def _classify(parsed: dict) -> tuple[str, str]:
     if domain and domain in domains:
         return ("surface", f"L2: allowlist domain @{domain}")
     if subject and _ACTION_SUBJECT_RE.search(subject):
-        return ("surface", "L2: action keyword")
+        return ("surface", "L2: action keyword (subject)")
+    if body and _ACTION_BODY_RE.search(body[:400]):
+        return ("surface", "L2: action keyword (body)")
 
     # L3: auto-noise
     if subject and _RECEIPT_RE.search(subject):
