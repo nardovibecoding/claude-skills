@@ -42,10 +42,13 @@ def _now_hkt() -> str:
 
 
 def _write_ledger(row: dict, dry_run: bool) -> None:
-    """Append one JSONL row. Append is atomic for rows < PIPE_BUF on POSIX."""
+    """Append one JSONL row. Append is atomic for rows < PIPE_BUF on POSIX.
+    Ledger writes always happen even in dry-run (for auditability); only
+    fs installs (clone/copy) are skipped in dry-run mode.
+    """
     line = json.dumps(row) + "\n"
     if dry_run:
-        print(f"[dry-run] ledger row would be appended: {line.rstrip()}", file=sys.stderr)
+        print(f"[dry-run] ledger row appending (always): {line.rstrip()}", file=sys.stderr)
     with open(LEDGER, "a") as fh:
         fh.write(line)
 
