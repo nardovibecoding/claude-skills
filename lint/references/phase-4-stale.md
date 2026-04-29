@@ -16,12 +16,7 @@
 5. Flag complex ones for user decision
 6. Consolidate overlapping topic files (merge into broader file)
 7. **Memory → wiki migration**: Before deleting any stale/obsolete memory entry, check if it contains valuable knowledge (architecture decisions, historical context, lessons learned). If yes, create a NardoWorld wiki article in the appropriate category (operations/, products/, lessons/) preserving the knowledge permanently. Only then remove from working memory.
-8. **Project-root markdown stale-prose** (zero-relative-time scan): for each project P under `~/NardoWorld/projects/*/` read `P/CLAUDE.md`, `P/AGENTS.md`, `P/README.md` if present. Run zero-relative-time grep:
-   ```bash
-   grep -nE '今天|昨天|刚刚|最近|上周|currently|for now|the new approach|today|yesterday|recently' "$f"
-   ```
-   Each hit without an adjacent ISO date (`YYYY-MM-DD` within ±2 lines) becomes a stale-prose finding. Memo path: `$MEMO_DIR/lint-stale-prose-$TODAY.md` — format: `- <file>:<line>: <matched-phrase> — <surrounding context>`.
-9. **Cross-project sync** via file-map dependency edges: parse `~/NardoWorld/projects/*/file-map.md` for dependency edges (project A's "depends_on" / "consumes" / "imports from" entries pointing at project B). For each edge A→B, when project B has had recent commits (last 7d) touching exported symbols (API endpoints, env-var names, DB table schemas), grep project A's docs for those symbol strings. Hits = potential staleness. Memo: `$MEMO_DIR/lint-cross-project-$TODAY.md`. If no machine-readable edge format, degrade to plain symbol-string grep across all projects.
+8. **Cross-project sync** via file-map dependency edges: parse `~/NardoWorld/projects/*/file-map.md` for dependency edges (project A's "depends_on" / "consumes" / "imports from" entries pointing at project B). For each edge A→B, when project B has had recent commits (last 7d) touching exported symbols (API endpoints, env-var names, DB table schemas), grep project A's docs for those symbol strings. Hits = potential staleness. Memo: `$MEMO_DIR/lint-cross-project-$TODAY.md`. If no machine-readable edge format, degrade to plain symbol-string grep across all projects.
 
 ## Unattended variant
 
