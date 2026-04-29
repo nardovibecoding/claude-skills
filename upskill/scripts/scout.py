@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 RATE_LIMIT_MIN = 100  # v1 floor; v2 promotes to dynamic per-lens via 2x guard
-KEYWORD_GROUP_SIZE = 5
+MAX_STANDARD_CALLS = 8  # spec §6: total ≤8 standard-mode calls
 MENU_ITEMS_PER_CALL = 5
 SEARCH_LIMIT = 30
 CANDIDATES_HARD_CAP = 200
