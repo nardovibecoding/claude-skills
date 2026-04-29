@@ -33,11 +33,25 @@ After step 1 REPRODUCE, the engine jumps straight to BUILD-MAP (2) / EXECUTION-M
 
 PARTIAL gap. The 17-step engine's PATTERN ANALYSIS (5) and DEPENDENCY-MAP (4) cover *some* of the same ground (finding what's relevant), but they map the *system*, not the *test case*. A 200-line failing repro and a 10-line failing repro feed both steps differently.
 
-## Recommendation
+## Recommendation — SHIPPED 2026-04-29
 
-If shipping a /debug bug v2, add explicit MINIMISE between REPRODUCE and BUILD-MAP. Cost: ~30 min spec work + an `experiments/repro-min.sh` artifact in the bug-slug dir. Upside: less wrong-direction investigation on long repros.
+Step 1.5 MINIMISE added between REPRODUCE and BUILD-MAP in `/debug bug` (bug mode only — drift/flaky/performance/wedge unchanged). Artifacts: `experiments/repro-min.sh` + `state/minimise-log.md` templates created on each invocation.
 
-NOT shipping today — flagged for next /debug iteration. This file lives at `phases/_pocock-diagnose-audit.md` so the bug-mode owner can see it next time the engine is touched.
+Files touched:
+- `phases/bug.md` — added row 1.5 to 17-step engine table
+- `bin/debug.py` — `_bug_step` accepts `int | float`; new step block between line 560 and former line 562
+- `SKILL.md` — engine description string updated to include MINIMISE
+
+Verified by dry-run smoke test 2026-04-29 17:?? :
+```
+step 1 REPRODUCE | --dry-run: skipped repro execution
+step 1.5 MINIMISE | --dry-run: skipped minimise
+step 2 BUILD-MAP | pipeline matches: 0 nodes, 0 edges
+```
+
+Followups for a future iteration:
+- Extend MINIMISE to flaky mode (loop repro shrinking) and performance mode (metric-sample shrinking) — different shrinking shapes per mode
+- Step number "1.5" is a stylistic choice to avoid renumbering the existing 17-step table; if a future refactor renumbers everything, fold into "step 2 MINIMISE" and shift the rest +1
 
 ## What NOT to import from Pocock
 
