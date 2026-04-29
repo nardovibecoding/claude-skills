@@ -178,13 +178,21 @@ def preflight_rate_limit(verbose: bool) -> tuple[int | None, str]:
     return remaining, ""
 
 
-def plan_standard(lens: dict) -> tuple[list[list[str]], list[str], int]:
-    """Return (keyword_groups, gh_topics, expected_calls)."""
+def plan_standard(lens: dict) -> tuple[list[str], list[str], int]:
+    """Return (keywords, gh_topics, expected_calls). One call per keyword/topic, capped at 8.
+
+    gh search treats OR as literal token, not a boolean — so OR-joining keywords
+    returns near-zero results. Per-keyword call is the reliable shape.
+    """
     keywords = list(lens.get("keywords", []))
     gh_topics = list(lens.get("gh_topics", []))
-    groups = chunked(keywords, KEYWORD_GROUP_SIZE)
-    expected = len(groups) + len(gh_topics)
-    return groups, gh_topics, expected
+    expected = len(keywords) + len(gh_topics)
+    if expected > MAX_STANDARD_CALLS:
+        # Truncate keywords first (gh_topics tend to be smaller, more curated)
+        budget_kw = max(0, MAX_STANDARD_CALLS - len(gh_topics))
+        keywords = keywords[:budget_kw]
+        expected = len(keywords) + len(gh_topics)
+    return keywords, gh_topics, expected
 
 
 def plan_menu(lens: dict) -> tuple[list[list[dict]], int]:
