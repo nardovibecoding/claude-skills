@@ -16,10 +16,10 @@ Local memo store at `~/telegram-claude-bot/memo/{pending,done}/`. Index at `~/te
 Inspect `$ARG` (the verb argument after `/memo`):
 
 - empty → **list mode** (5 newest, both pending+done)
-- starts with `#` → **tag-filter mode** (S2 — this skill)
+- starts with `#` → **tag-filter mode** (S2)
 - starts with `search ` → **search mode** (coming in S3)
 - starts with `--since ` → **diff mode** (coming in S7)
-- anything else → **scribble mode** (coming in S4)
+- anything else → **scribble mode** (S4 — write a terminal memo, parse #tag tokens out of body)
 
 ## Steps
 
@@ -53,8 +53,8 @@ Inspect `$ARG` (the verb argument after `/memo`):
        exit 0
        ;;
      *)
-       echo "(scribble mode — coming in slice S4)"
-       exit 0
+       MODE=scribble
+       SCRIBBLE_BODY="$ARG"
        ;;
    esac
    ```
