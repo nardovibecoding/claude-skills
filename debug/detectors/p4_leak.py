@@ -71,16 +71,20 @@ def scan(host: str) -> dict:
         findings.append({"pid": pid, "rss_kb": rss, "vsz_kb": vsz,
                          "comm": parts[3], "args": parts[4][:120] if len(parts) > 4 else parts[3],
                          "delta_kb_30s": delta})
-    crit = [f for f in findings if f["rss_kb"] >= RSS_CRIT_KB or f["delta_kb_30s"] >= DELTA_CRIT_KB]
-    warn = [f for f in findings if f["rss_kb"] >= RSS_WARN_KB or f["delta_kb_30s"] >= DELTA_WARN_KB]
+    rss_t = RSS_THRESHOLDS_KB.get(host, _DEFAULT_RSS)
+    delta_t = DELTA_THRESHOLDS_KB.get(host, _DEFAULT_DELTA)
+    crit = [f for f in findings if f["rss_kb"] >= rss_t["crit"] or f["delta_kb_30s"] >= delta_t["crit"]]
+    warn = [f for f in findings if f["rss_kb"] >= rss_t["warn"] or f["delta_kb_30s"] >= delta_t["warn"]]
     if crit:
         verdict = "crit"
-        summary = f"{len(crit)} procs RSS>=1.5GB or grew>=200MB/30s"
+        summary = (f"{len(crit)} procs RSS>={rss_t['crit']//1000}MB "
+                   f"or grew>={delta_t['crit']//1000}MB/30s on {host}")
     elif warn:
         verdict = "warn"
-        summary = f"{len(warn)} procs RSS>=500MB or grew>=50MB/30s"
+        summary = (f"{len(warn)} procs RSS>={rss_t['warn']//1000}MB "
+                   f"or grew>={delta_t['warn']//1000}MB/30s on {host}")
     else:
         verdict = "ok"
-        summary = "top procs within budget"
+        summary = f"top procs within budget on {host}"
     return {"verdict": verdict, "evidence_cmd": cmd,
             "findings": findings, "summary": summary}
