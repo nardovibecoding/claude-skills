@@ -263,6 +263,7 @@ def _parse_message(msg: dict) -> dict | None:
         "from_addr": from_addr,
         "subject": subject,
         "body_raw": body_text,
+        "headers": headers,  # Slice 3: classifier reads List-Unsubscribe
     }
 
 
