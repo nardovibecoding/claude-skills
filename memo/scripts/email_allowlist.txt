@@ -1,0 +1,9 @@
+# Hard-surface allowlist — emails from these addresses/domains ALWAYS surface as memos
+# Format: full email (bernard.ngb@gmail.com) or @domain (@anthropic.com)
+# One per line. # = comment. Blank lines OK.
+# Edit freely; reload happens on next poll cycle.
+
+# === seed entries (Bernard: replace/extend) ===
+# @anthropic.com
+# @kalshi.com
+# @polymarket.com
