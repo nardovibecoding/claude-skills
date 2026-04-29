@@ -59,18 +59,21 @@ def scan(host: str) -> dict:
                              "suspicious": is_suspicious})
             if is_suspicious:
                 suspicious += 1
+    # Verdict driven by SUSPICIOUS hits only. The "non-allowlist PPID=1" count
+    # is reported but does not flip the verdict — Mac alone has hundreds of
+    # legit PPID=1 helpers (Chrome Helper, *Service.app, etc.) that no static
+    # allowlist will ever fully cover.
     if suspicious >= 5:
         verdict = "crit"
-        summary = f"{suspicious} suspicious orphans (git-pack/defunct), {len(findings)} total non-allowlist PPID=1"
+        summary = f"{suspicious} suspicious orphans (git-pack/defunct), {len(findings)} non-allowlist PPID=1 (informational)"
     elif suspicious > 0:
         verdict = "warn"
-        summary = f"{suspicious} suspicious orphans, {len(findings)} total"
-    elif len(findings) > 50:
-        # Lots of unfamiliar PPID=1 procs; allowlist may be stale, surface for review.
-        verdict = "warn"
-        summary = f"{len(findings)} non-allowlist PPID=1 procs (review allowlist)"
+        summary = f"{suspicious} suspicious orphans, {len(findings)} non-allowlist PPID=1 (informational)"
     else:
         verdict = "ok"
-        summary = f"{len(findings)} non-allowlist PPID=1 procs (none suspicious)"
+        summary = f"0 suspicious orphans, {len(findings)} non-allowlist PPID=1 (informational)"
+    # Limit findings to suspicious + first 10 non-suspicious so the .md stays readable.
+    susp_findings = [f for f in findings if f["suspicious"]]
+    other_findings = [f for f in findings if not f["suspicious"]][:10]
     return {"verdict": verdict, "evidence_cmd": cmd,
-            "findings": findings[:50], "summary": summary}
+            "findings": susp_findings + other_findings, "summary": summary}
