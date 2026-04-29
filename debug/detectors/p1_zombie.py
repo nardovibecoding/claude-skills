@@ -3,6 +3,16 @@ from __future__ import annotations
 
 from ._shell import run_on
 
+# Per-host thresholds. Mac is a workstation; some short-lived zombies between
+# reaping cycles are normal. VPS hosts run lean and any zombie is suspicious.
+THRESHOLDS = {
+    "mac":    {"warn": 10, "crit": 30},
+    "local":  {"warn": 10, "crit": 30},
+    "hel":    {"warn": 1,  "crit": 5},
+    "london": {"warn": 1,  "crit": 5},
+}
+_DEFAULT_T = {"warn": 5, "crit": 15}
+
 
 def scan(host: str) -> dict:
     # ps STAT field 'Z' = zombie/defunct. Same flag works on macOS + Linux.
