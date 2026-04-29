@@ -1605,8 +1605,11 @@ def cmd_performance(argv: list[str]) -> int:
     host, feature = parse_target(target)
     dry = flags["dry_run"]
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    perf_slug = f"{_slugify(feature)}-perf-{ts}"
+    if flags.get("bug_slug"):
+        perf_slug = flags["bug_slug"]
+    else:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        perf_slug = f"{_slugify(feature)}-perf-{ts}"
     perf_dir = SHIP_ROOT / perf_slug
     state_dir = perf_dir / "state"
     exp_dir = perf_dir / "experiments"
