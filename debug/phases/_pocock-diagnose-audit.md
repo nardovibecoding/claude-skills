@@ -49,9 +49,22 @@ step 1.5 MINIMISE | --dry-run: skipped minimise
 step 2 BUILD-MAP | pipeline matches: 0 nodes, 0 edges
 ```
 
-Followups for a future iteration:
-- Extend MINIMISE to flaky mode (loop repro shrinking) and performance mode (metric-sample shrinking) — different shrinking shapes per mode
-- Step number "1.5" is a stylistic choice to avoid renumbering the existing 17-step table; if a future refactor renumbers everything, fold into "step 2 MINIMISE" and shift the rest +1
+### Extension shipped 2026-04-29 (same session): flaky + performance modes
+
+- **Flaky variant** — shrink env/config until smallest setup that still produces fail-rate ≥30% over N runs. Output: `experiments/repro-min-flaky.sh` + `state/minimise-log.md`. Doc: `phases/flaky.md` § "Step 1.5 MINIMISE (flaky variant)". Code: `cmd_flaky` between REPRODUCE and BUILD-MAP.
+- **Performance variant** — shrink workload until ONLY the offending metric still busts budget (isolates load-bearing axis). Output: `experiments/workload-min.sh` + `state/minimise-log.md`. Doc: `phases/performance.md` § "Step 1.5 MINIMISE (performance variant)". Code: `cmd_performance` between REPRODUCE and BUILD-MAP.
+
+Smoke verified 2026-04-29 18:44 :
+```
+flaky:        step 1.5 MINIMISE | --dry-run: skipped minimise
+performance:  step 1.5 MINIMISE | --dry-run: skipped minimise
+```
+Artifacts created in both runs.
+
+### Remaining TODOs
+
+- Extend MINIMISE to **leak**, **race**, **wedge**, **drift** modes (each has its own shrinking shape — RSS-still-climbs / race-still-fires / D-state-still-entered / drift-still-detected). Pre-S5 wedge mode might be a stretch since wedge is already kernel-level.
+- Step number "1.5" is a stylistic choice to avoid renumbering the existing 17-step table; if a future refactor renumbers everything, fold into "step 2 MINIMISE" and shift the rest +1.
 
 ## What NOT to import from Pocock
 
