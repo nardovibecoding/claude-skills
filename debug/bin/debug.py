@@ -1467,6 +1467,10 @@ def cmd_performance(argv: list[str]) -> int:
         "perf_slug": perf_slug, "baseline": str(baseline_path),
         "verify_outcome": verify_outcome, "phase4_state_node": state_node.get("id") if state_node else None,
         "metric_count": len(metrics),
+        "detector_host": detector_host,
+        "detectors": [{"id": r.get("detector"), "verdict": r.get("verdict"),
+                       "summary": r.get("summary"), "n_findings": len(r.get("findings", []) or [])}
+                      for r in detector_results],
     }
     freshness = datetime.now(timezone.utc).isoformat()
     detected_via = f"/debug performance {target}"
