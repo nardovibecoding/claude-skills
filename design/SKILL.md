@@ -54,16 +54,19 @@ If prompt names a layout type, load `archetypes/<name>.md`. Triggers: "dashboard
 
 ## Surface auto-detection (renderer)
 
-Renderer is **never asked**. Detect from project context:
+Renderer is **never asked**. Resolve in priority order:
 
-| Signal | Renderer |
-|---|---|
-| Open `.swift` file, `Package.swift` or `*.xcodeproj` in cwd or recent reads | `renderers/swiftui.md` |
-| `manifest.json` with `"manifest_version"` field | `renderers/extension.md` |
-| `package.json` with `react`/`next`/`vite`/`tailwindcss` | `renderers/html.md` |
-| Default fallback | `renderers/html.md` |
+1. **Project alias in prompt** (`project-aliases.md`) — wins. e.g. "vibe island" → SwiftUI even if cwd has no .swift files.
+2. **File signals in cwd / recent reads**:
+   | Signal | Renderer |
+   |---|---|
+   | Open `.swift`, `Package.swift`, `*.xcodeproj` | `renderers/swiftui.md` |
+   | `manifest.json` with `"manifest_version"` | `renderers/extension.md` |
+   | `package.json` with `react`/`next`/`vite`/`tailwindcss` | `renderers/html.md` |
+3. **Surface words in prompt** ("popup", "extension", "side panel" → extension; "macOS app", "SwiftUI" → swiftui; "dashboard", "web" → html).
+4. **Default fallback** → `renderers/html.md`.
 
-Multiple signals → the more specific wins (SwiftUI > extension > html).
+Multiple signals → the more specific wins (project alias > swift file > manifest > package.json > prompt words).
 
 ---
 
