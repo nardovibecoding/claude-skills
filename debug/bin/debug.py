@@ -542,6 +542,112 @@ def _bug_step(n: int | float, name: str, msg: str) -> None:
     print(f"step {n} {name} | {msg}")
 
 
+def _build_fingerprint(flags: dict):
+    """Build minimise.Fingerprint from CLI flags. Returns None if no criteria provided."""
+    sys.path.insert(0, str(Path(__file__).parent.parent / "_lib"))
+    from minimise import Fingerprint  # type: ignore
+    if (flags.get("fingerprint_exit") is None
+            and not flags.get("fingerprint_stderr")
+            and not flags.get("fingerprint_stdout")):
+        return None
+    return Fingerprint(
+        exit_code=flags.get("fingerprint_exit"),
+        stderr_regex=flags.get("fingerprint_stderr"),
+        stdout_regex=flags.get("fingerprint_stdout"),
+    )
+
+
+def _run_auto_minimise(repro_path: Path, repro_min_path: Path, log_path: Path,
+                       flags: dict, header_label: str) -> tuple[bool, str]:
+    """
+    Run ddmin per `flags['minimise_target']`. Writes repro-min + minimise-log.
+    Returns (ok, summary_msg). On error, writes error to log_path and returns (False, msg).
+    """
+    sys.path.insert(0, str(Path(__file__).parent.parent / "_lib"))
+    from minimise import (  # type: ignore
+        ddmin_lines, ddmin_env, ddmin_files, render_log, precheck_deterministic,
+    )
+
+    fp = _build_fingerprint(flags)
+    if fp is None:
+        msg = ("ERROR: --auto-minimise requires a fingerprint. Pass one of:\n"
+               "  --fingerprint=exit:N  (e.g. exit:1)\n"
+               "  --fingerprint-stderr=<regex>\n"
+               "  --fingerprint-stdout=<regex>")
+        log_path.write_text(f"# {header_label}\n\n{msg}\n")
+        return False, msg
+
+    if not repro_path.exists():
+        msg = f"ERROR: repro.sh missing at {repro_path}. Populate Step 1 first."
+        log_path.write_text(f"# {header_label}\n\n{msg}\n")
+        return False, msg
+
+    target = flags.get("minimise_target", "lines")
+    max_probes = flags.get("max_probes", 100)
+    reset_cmd = flags.get("reset_cmd")
+
+    # Non-determinism precheck (AC-8) — only for bug variant on lines target;
+    # flaky variant intentionally skips this.
+    if header_label.startswith("Minimise log") and target == "lines":
+        try:
+            deterministic = precheck_deterministic(repro_path, fp, trials=3, timeout=60)
+        except Exception as e:
+            msg = f"ERROR during determinism precheck: {e}"
+            log_path.write_text(f"# {header_label}\n\n{msg}\n")
+            return False, msg
+        if not deterministic:
+            msg = "[WARN: non-deterministic — use /debug flaky --auto-minimise for flaky bugs]"
+            log_path.write_text(f"# {header_label}\n\n{msg}\n")
+            return False, msg
+
+    try:
+        if target == "lines":
+            _, stats = ddmin_lines(repro_path, fp, reset_cmd=reset_cmd,
+                                   max_probes=max_probes, out_path=repro_min_path, timeout=60)
+        elif target == "env":
+            keys_csv = flags.get("strip_env") or ""
+            if not keys_csv:
+                msg = "ERROR: --target=env requires --strip-env=KEY1,KEY2,..."
+                log_path.write_text(f"# {header_label}\n\n{msg}\n")
+                return False, msg
+            keys = [k.strip() for k in keys_csv.split(",") if k.strip()]
+            base_env = dict(os.environ)
+            keep, stats = ddmin_env(keys, base_env, [str(repro_path)], fp,
+                                    reset_cmd=reset_cmd, max_probes=max_probes, timeout=60)
+            # Emit a runner-script that sets only the minimal env subset
+            env_lines = "\n".join(f'export {k}="{base_env.get(k,"")}"' for k in keep)
+            repro_min_path.write_text(f"#!/usr/bin/env bash\nset -e\n{env_lines}\nexec {repro_path}\n")
+            os.chmod(repro_min_path, 0o755)
+        elif target == "files":
+            glob = flags.get("strip_glob")
+            if not glob:
+                msg = "ERROR: --target=files requires --strip-glob=<pattern>"
+                log_path.write_text(f"# {header_label}\n\n{msg}\n")
+                return False, msg
+            paths = list(Path(".").glob(glob))
+            if not paths:
+                msg = f"ERROR: --strip-glob={glob} matched zero files"
+                log_path.write_text(f"# {header_label}\n\n{msg}\n")
+                return False, msg
+            keep, stats = ddmin_files(paths, [str(repro_path)], fp,
+                                      reset_cmd=reset_cmd, max_probes=max_probes, timeout=60)
+            kept_list = "\n".join(f"# kept: {p}" for p in keep)
+            repro_min_path.write_text(f"#!/usr/bin/env bash\n{kept_list}\nexec {repro_path}\n")
+            os.chmod(repro_min_path, 0o755)
+        else:
+            msg = f"ERROR: unknown --target={target} (use lines|env|files)"
+            log_path.write_text(f"# {header_label}\n\n{msg}\n")
+            return False, msg
+    except Exception as e:
+        msg = f"ERROR during ddmin: {type(e).__name__}: {e}"
+        log_path.write_text(f"# {header_label}\n\n{msg}\n")
+        return False, msg
+
+    log_path.write_text(render_log(stats, header_label))
+    cap_note = " [cap-reached]" if stats.cap_reached else ""
+    return True, f"probes={stats.probes} kept_strips={stats.kept_strips}{cap_note}"
+
+
 def cmd_bug(argv: list[str]) -> int:
     flags = _parse_bug_args(argv)
     symptom = flags["symptom"]
