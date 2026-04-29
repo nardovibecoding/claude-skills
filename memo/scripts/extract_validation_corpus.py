@@ -56,6 +56,7 @@ def _list_ids(service, query: str, cap: int) -> list[str]:
     ids: list[str] = []
     page_token = None
     while len(ids) < cap:
+        resp: dict = {}
         for attempt in range(2):
             try:
                 resp = service.users().messages().list(
