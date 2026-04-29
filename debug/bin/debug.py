@@ -1426,7 +1426,7 @@ def cmd_flaky(argv: list[str]) -> int:
     flaky_runs_path.write_text(table_md)
     _bug_step(1, "REPRODUCE", f"loop runs={runs} fails={fail_count} → {flaky_runs_path}")
 
-    # Step 1.5 MINIMISE (pocock/skills diagnose — flaky variant)
+    # Step 1.5 MINIMISE (Zeller ddmin + N-runs flaky probe; opt-in via --auto-minimise)
     repro_min = exp_dir / "repro-min-flaky.sh"
     minimise_log = state_dir / "minimise-log.md"
     fail_rate = (fail_count / runs * 100) if runs else 0.0
@@ -1434,6 +1434,19 @@ def cmd_flaky(argv: list[str]) -> int:
         repro_min.write_text("#!/usr/bin/env bash\n# dry-run: minimise skipped\nexit 0\n")
         minimise_log.write_text(f"# minimise log (flaky) — {symptom}\n\ndry-run\n")
         _bug_step(1.5, "MINIMISE", "--dry-run: skipped minimise")
+    elif flags.get("auto_minimise"):
+        repro = exp_dir / "repro.sh"
+        ok, summary = _run_auto_minimise_flaky(
+            repro_path=repro,
+            repro_min_path=repro_min,
+            log_path=minimise_log,
+            flags=flags,
+            header_label=f"Minimise log (flaky) — {symptom} — baseline {fail_rate:.0f}% fail-rate",
+        )
+        if ok:
+            _bug_step(1.5, "MINIMISE", f"auto-minimise (flaky) OK — {summary} — out: {repro_min}, log: {minimise_log}")
+        else:
+            _bug_step(1.5, "MINIMISE", f"auto-minimise (flaky) FAILED — see {minimise_log}")
     else:
         if not repro_min.exists():
             repro_min.write_text(
@@ -1442,6 +1455,7 @@ def cmd_flaky(argv: list[str]) -> int:
                 "# Strategy: strip env / data / concurrency / setup one at a time;\n"
                 "# re-run the loop after each strip; KEEP the strip if fail-rate stays ≥30%, REVERT if it drops.\n"
                 "# Halt when no further strip leaves fail-rate above the threshold.\n"
+                "# Or: pass --auto-minimise --fingerprint=exit:1 --runs=10 --threshold=0.3 to ddmin automatically.\n"
                 "exit 0\n"
             )
         os.chmod(repro_min, 0o755)
@@ -1455,7 +1469,7 @@ def cmd_flaky(argv: list[str]) -> int:
                 "| 1 | <e.g. concurrent worker count> | 50% | keep removed |\n"
                 "| 2 | <e.g. external API call> | 0% | reverted (race was here) |\n"
             )
-        _bug_step(1.5, "MINIMISE", f"flaky-minimise template at {repro_min} + log at {minimise_log} (baseline {fail_rate:.0f}% fail-rate)")
+        _bug_step(1.5, "MINIMISE", f"flaky-minimise template at {repro_min} + log at {minimise_log} (baseline {fail_rate:.0f}% fail-rate) — or use --auto-minimise")
 
     # Step 2-4 BUILD/EXEC/DEP
     p4 = None
