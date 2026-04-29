@@ -17,6 +17,13 @@ description: |
     /debug wedge <unit>             — Wedge mode (process in kernel D-state, log rate=0, SIGTERM hangs). "X is wedged / frozen in kernel / D-state"; flags --capture-only --read-trace
     /debug list                     — show realize-debt.md ledger
 
+  Step 1.5 MINIMISE auto-mode (opt-in, all 3 verbs):
+    bug:         /debug bug "<symptom>" --auto-minimise --fingerprint=exit:1 [--target=lines|env|files] [--reset-cmd=...]
+    flaky:       /debug flaky "<symptom>" --auto-minimise --fingerprint=exit:1 --runs=10 --threshold=0.3
+    performance: /debug performance <feature> --auto-minimise --baseline-ms=N --workload-axis=SIZE --workload-low=1 --workload-high=1000
+  Common: --max-probes=N (default 100/30) | --strip-glob=<g> (files target) | --strip-env=K1,K2 (env target)
+  Engine: Zeller binary-partition ddmin (lib at _lib/minimise.py). When unset, template-stub fallback preserved (zero regression).
+
   NOT FOR: random fixes (Iron Law forbids), claims without verification (second Iron Law forbids), replacing /ship audit (imports it).
 verified_at: 2026-04-26
 documents:
