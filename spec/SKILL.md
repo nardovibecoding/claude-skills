@@ -64,12 +64,23 @@ If user wants a different one, they pass `/spec <slug>` explicitly. No list show
 
 ### Translation rules (HARD — these make the output simple)
 
-- **Strip jargon.** Never emit: §, EARS, SPREAD, SHRINK, premise inheritance, owning agent, strict-plan, strict-execute, citation markers `[cited ...]`, evidence ID codes (O1/F1/R1), tier labels, ACs as ID lists.
-- **Translate technical terms.** "user-invocable skill" → "slash command", "frontmatter" → "metadata header", "EARS criteria" → omit (rephrase as plain bullets), "premise" → "assumption".
+- **Strip structural jargon.** Never emit: §, EARS, SPREAD, SHRINK, premise inheritance, owning agent, strict-plan, strict-execute, citation markers `[cited ...]`, evidence ID codes (O1/F1/R1), tier labels, ACs as ID lists.
+- **Translate domain jargon: rephrase as plain English, keep the original term in parens.** Every technical/domain noun gets rewritten as a verb-phrase or plain noun a non-coder understands, then the original term in parens for precision. Examples:
+  - "silent edges" → "places where signals get dropped with no log entry (silent edges)"
+  - "dedup loop" → "the step that filters duplicates (dedup loop)"
+  - "fast loop / slow-loop" → "the 250ms scan tick (fast loop) / the 5s rebalance tick (slow loop)"
+  - "trace event" → "a one-line log entry marking the drop (trace event)"
+  - "1-in-100 sampling" → "logging only 1 of every 100 events (1-in-100 sampling)"
+  - "risk-gate / risk engine" → "the final approval check (risk gate)"
+  - "scoring-error swallow" → "a caught exception that disappears with no log (scoring-error swallow)"
+  - "signal-legs" → "individual signals (signal-legs)"
+  - "exit-branch lines" → "the lines that end the function early (exit branches)"
+  - "head-of-file samples" → "lines from the start of each log file (head samples)"
+  - Strategy names (`calibration_arb`, `time_decay`) and file names (`risk.ts`) stay as-is — they're identifiers, not jargon.
 - **Sentences ≤15 words.** Active voice. No "shall". No "WHEN ... THEN" — rephrase as "if X happens, it does Y".
 - **Drop scaffolding.** §0 SCOPE → "What it is" + "Why it exists". §3 ACCEPTANCE → "What it does". §4 OUT OF SCOPE → "Constraints". §6 RISKS → "Risks worth knowing". §7 VERDICT → "Status".
 - **No section headers from source.** The output uses the bold labels above, not §0/§1/etc.
-- **Every bullet readable cold.** A new reader with zero context understands each line.
+- **Every bullet readable cold.** A new reader with zero context understands each line — the parens give the original term back to the expert reader without blocking the layman one.
 - **Concrete > abstract.** Prefer "reads files in ~/.ship/" over "consumes spec artifacts from configured root".
 - **Prune ruthlessly.** If a section has no real content, omit it entirely. Better 6 strong bullets than 15 weak ones.
 
