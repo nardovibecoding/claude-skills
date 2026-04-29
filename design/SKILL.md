@@ -146,6 +146,10 @@ Steps 6/7/8 are **unconditional**. Never skipped. Never optional.
 
 ```
 SKILL.md                     # this file
+project-aliases.md           # project name → surface + default vibe map
+vibes/
+  encyclopedia.md            # 80 plain-English vibe presets (PRIMARY)
+  improv.md                  # fallback when no vibe matches
 tokens/
   dtcg-schema.md             # universal token format spec
   design-md-schema.md        # human prose companion
