@@ -1092,6 +1092,37 @@ def cmd_flaky(argv: list[str]) -> int:
     flaky_runs_path.write_text(table_md)
     _bug_step(1, "REPRODUCE", f"loop runs={runs} fails={fail_count} → {flaky_runs_path}")
 
+    # Step 1.5 MINIMISE (pocock/skills diagnose — flaky variant)
+    repro_min = exp_dir / "repro-min-flaky.sh"
+    minimise_log = state_dir / "minimise-log.md"
+    fail_rate = (fail_count / runs * 100) if runs else 0.0
+    if dry:
+        repro_min.write_text("#!/usr/bin/env bash\n# dry-run: minimise skipped\nexit 0\n")
+        minimise_log.write_text(f"# minimise log (flaky) — {symptom}\n\ndry-run\n")
+        _bug_step(1.5, "MINIMISE", "--dry-run: skipped minimise")
+    else:
+        if not repro_min.exists():
+            repro_min.write_text(
+                "#!/usr/bin/env bash\n"
+                "# Minimised flaky repro — start as a copy of repro.sh.\n"
+                "# Strategy: strip env / data / concurrency / setup one at a time;\n"
+                "# re-run the loop after each strip; KEEP the strip if fail-rate stays ≥30%, REVERT if it drops.\n"
+                "# Halt when no further strip leaves fail-rate above the threshold.\n"
+                "exit 0\n"
+            )
+        os.chmod(repro_min, 0o755)
+        if not minimise_log.exists():
+            minimise_log.write_text(
+                f"# Minimise log (flaky) — {symptom}\n\n"
+                f"Baseline fail-rate: {fail_rate:.1f}% ({fail_count}/{runs})\n"
+                "Threshold to retain strip: ≥30% fail-rate over N runs.\n\n"
+                "| # | Removed | New fail-rate | Decision |\n"
+                "|---|---|---|---|\n"
+                "| 1 | <e.g. concurrent worker count> | 50% | keep removed |\n"
+                "| 2 | <e.g. external API call> | 0% | reverted (race was here) |\n"
+            )
+        _bug_step(1.5, "MINIMISE", f"flaky-minimise template at {repro_min} + log at {minimise_log} (baseline {fail_rate:.0f}% fail-rate)")
+
     # Step 2-4 BUILD/EXEC/DEP
     p4 = None
     try:
