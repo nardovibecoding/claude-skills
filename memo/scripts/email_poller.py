@@ -73,6 +73,48 @@ TRUNCATED_MARKER = "\n\n[truncated]"
 MEMO_PROCESSED_LABEL = "memo-processed"
 _LABEL_ID_CACHE: dict[str, str] = {}
 
+# ───────────────────────── Classifier regexes (Slice 3 — FROZEN) ─────────────────────────
+# Authored from audit §A scenarios + §B taxonomy + general email-noise priors.
+# DO NOT tune by sampling Bernard's inbox — tautological. Slice 4 extracts a
+# held-out validation corpus; Slice 5 measures recall + FP rate. If Slice 5
+# fails the gate, escalate to Bernard for a new authoring round; do not patch here.
+
+# L1: bulk-mail platforms (sender domain). Common ESP / newsletter / drip platforms.
+_SUPPRESS_DOMAIN_RE = re.compile(
+    r"(?:mailchimp\.com|sendgrid\.net|mandrillapp\.com|mailgun\.org|amazonses\.com"
+    r"|sparkpostmail\.com|mktomail\.com|marketo\.com|hubspot(?:email)?\.com"
+    r"|intercom\.help|customer\.io|klaviyo\.com|substack\.com|convertkit\.com"
+    r"|beehiiv\.com|mail\.beehiiv\.com)$",
+    re.IGNORECASE,
+)
+
+# L1: promo subject keywords.
+_PROMO_SUBJECT_RE = re.compile(
+    r"(?i)\b(unsubscribe|sale|discount|% off|deal|webinar|whitepaper"
+    r"|exclusive offer|limited time|free trial)\b"
+)
+
+# L2: action / urgency subject keywords.
+_ACTION_SUBJECT_RE = re.compile(
+    r"(?i)\b(urgent|action required|action needed|please review|please sign"
+    r"|sign here|verify|confirm|deadline|due (?:today|tomorrow|by)"
+    r"|by (?:friday|monday|tuesday|wednesday|thursday|saturday|sunday|EOD|EOW)"
+    r"|past due|overdue|expir(?:es?|ing)|reminder:|response needed"
+    r"|reply needed|important|critical)\b"
+)
+
+# L3: receipt / order confirmation subject keywords.
+_RECEIPT_RE = re.compile(
+    r"(?i)\b(receipt|order #?\w+|order confirmation|invoice"
+    r"|payment (?:received|confirmation)|your (?:order|purchase)"
+    r"|thanks for (?:your )?(?:order|purchase|subscription))\b"
+)
+
+# L3: OTP / 2FA verification body pattern (6-digit code + verify keyword).
+_OTP_RE = re.compile(
+    r"(?i)\b\d{6}\b.*(?:verif|confirm|code|token|2fa|two.factor)"
+)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s email_poller %(levelname)s %(message)s",
