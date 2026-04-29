@@ -99,7 +99,7 @@ Wiring mode. `<target>` syntax:
 Loads `phases/wiring.md`. Returns one of `{wired, partial, not_wired, inconclusive}` + Phase 4 evidence citations + writes a ledger entry.
 
 ### `/debug bug "<symptom>"`
-Bug mode. Walks the 17-step engine (TRIAGE → REPRODUCE → BUILD-MAP → EXECUTION-MAP → DEPENDENCY-MAP → PATTERN ANALYSIS → HYPOTHESIS GEN → EXPECTED-SIGNAL → INSTRUMENT → RUNTIME-VERIFY → CLASSIFY → DEPTH-CHECK → ≥3-FAIL ESCALATION → FIX → CLEANUP → VERDICT-VERIFY → LEDGER). Loads `phases/bug.md`.
+Bug mode. Walks the 17-step engine (TRIAGE → REPRODUCE → MINIMISE → BUILD-MAP → EXECUTION-MAP → DEPENDENCY-MAP → PATTERN ANALYSIS → HYPOTHESIS GEN → EXPECTED-SIGNAL → INSTRUMENT → RUNTIME-VERIFY → CLASSIFY → DEPTH-CHECK → ≥3-FAIL ESCALATION → FIX → CLEANUP → VERDICT-VERIFY → LEDGER). Loads `phases/bug.md`.
 
 Flags:
 - `--quick` — skip ⚡light steps (Step 4 DEPENDENCY-MAP)
