@@ -648,6 +648,143 @@ def _run_auto_minimise(repro_path: Path, repro_min_path: Path, log_path: Path,
     return True, f"probes={stats.probes} kept_strips={stats.kept_strips}{cap_note}"
 
 
+def _run_auto_minimise_flaky(repro_path: Path, repro_min_path: Path, log_path: Path,
+                              flags: dict, header_label: str) -> tuple[bool, str]:
+    """Flaky variant: wrap line-level ddmin probe with N-runs majority oracle."""
+    sys.path.insert(0, str(Path(__file__).parent.parent / "_lib"))
+    from minimise import (  # type: ignore
+        ddmin, run_command, render_log,
+    )
+
+    fp = _build_fingerprint(flags)
+    if fp is None:
+        msg = "ERROR: --auto-minimise requires --fingerprint=exit:N (or --fingerprint-stderr=<rx>)"
+        log_path.write_text(f"# {header_label}\n\n{msg}\n")
+        return False, msg
+
+    if not repro_path.exists():
+        msg = f"ERROR: repro.sh missing at {repro_path}"
+        log_path.write_text(f"# {header_label}\n\n{msg}\n")
+        return False, msg
+
+    runs = flags.get("runs", 10)
+    threshold = flags.get("threshold", 0.5)
+    if runs < 5:
+        msg = f"WARN: --runs={runs} below 5 — flaky-fingerprint signal weak. Continuing anyway."
+        # Don't abort — surface in log + carry on
+    else:
+        msg = ""
+
+    max_probes = flags.get("max_probes", 100)
+    reset_cmd = flags.get("reset_cmd")
+
+    # Read original lines once
+    original_lines = repro_path.read_text().splitlines(keepends=True)
+    structural = [(i, ln) for i, ln in enumerate(original_lines)
+                  if ln.startswith("#!") or ln.strip().startswith("set ")]
+    candidate = [(i, ln) for i, ln in enumerate(original_lines)
+                 if not (ln.startswith("#!") or ln.strip().startswith("set "))]
+
+    tmp_path = repro_path.with_suffix(repro_path.suffix + ".probe")
+
+    def flaky_probe_subset(subset) -> bool:
+        chosen = sorted(structural + subset, key=lambda x: x[0])
+        body = "".join(ln for _, ln in chosen)
+        tmp_path.write_text(body)
+        os.chmod(tmp_path, 0o755)
+        fails = 0
+        for _ in range(runs):
+            if reset_cmd:
+                rr = run_command(reset_cmd, timeout=30)
+                if rr.exit != 0:
+                    return False  # reset broken — bail this probe
+            r = run_command([str(tmp_path)], timeout=60)
+            if fp.match(r):
+                fails += 1
+        return (fails / runs) >= threshold
+
+    try:
+        keep, stats = ddmin(candidate, flaky_probe_subset, max_probes=max_probes)
+    except Exception as e:
+        emsg = f"ERROR during flaky ddmin: {type(e).__name__}: {e}"
+        log_path.write_text(f"# {header_label}\n\n{emsg}\n")
+        return False, emsg
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+    final_lines = [ln for _, ln in sorted(structural + keep, key=lambda x: x[0])]
+    repro_min_path.write_text("".join(final_lines))
+    os.chmod(repro_min_path, 0o755)
+
+    log_text = render_log(stats, header_label)
+    if msg:
+        log_text = f"# {header_label}\n\n{msg}\n\n" + log_text.split("\n", 1)[1] if "\n" in log_text else log_text
+    log_path.write_text(log_text)
+
+    cap_note = " [cap-reached]" if stats.cap_reached else ""
+    return True, f"probes={stats.probes} kept_strips={stats.kept_strips} runs/probe={runs} threshold={threshold}{cap_note}"
+
+
+def _run_auto_minimise_perf(repro_path: Path, repro_min_path: Path, log_path: Path,
+                             flags: dict, header_label: str) -> tuple[bool, str]:
+    """Performance variant: 1D bsearch on workload size showing regression vs baseline."""
+    sys.path.insert(0, str(Path(__file__).parent.parent / "_lib"))
+    from minimise import bsearch_workload, run_command, render_log  # type: ignore
+
+    baseline_ms = flags.get("baseline_ms")
+    axis = flags.get("workload_axis")
+    low = flags.get("workload_low", 1)
+    high = flags.get("workload_high", 1000)
+    target_ratio = float(flags.get("target_ratio", 1.5))
+    max_probes = flags.get("max_probes", 30)
+    reset_cmd = flags.get("reset_cmd")
+
+    if not baseline_ms or not axis:
+        msg = ("ERROR: --auto-minimise (performance) requires --baseline-ms=N and --workload-axis=<arg-name>.\n"
+               "The repro.sh must accept the workload size as $1 (or via the named env var).")
+        log_path.write_text(f"# {header_label}\n\n{msg}\n")
+        return False, msg
+
+    if not repro_path.exists():
+        msg = f"ERROR: repro.sh missing at {repro_path}"
+        log_path.write_text(f"# {header_label}\n\n{msg}\n")
+        return False, msg
+
+    def perf_fn(size: int) -> int:
+        if reset_cmd:
+            rr = run_command(reset_cmd, timeout=30)
+            if rr.exit != 0:
+                return 0
+        env = dict(os.environ)
+        env[axis] = str(size)
+        r = run_command([str(repro_path), str(size)], env=env, timeout=120)
+        return r.wall_ms
+
+    try:
+        smallest, stats = bsearch_workload(low, high, perf_fn, baseline_ms,
+                                           target_ratio=target_ratio, max_probes=max_probes)
+    except Exception as e:
+        emsg = f"ERROR during perf bsearch: {type(e).__name__}: {e}"
+        log_path.write_text(f"# {header_label}\n\n{emsg}\n")
+        return False, emsg
+
+    repro_min_path.write_text(
+        f"#!/usr/bin/env bash\n"
+        f"# Smallest workload showing regression: {axis}={smallest} (baseline={baseline_ms}ms ratio>={target_ratio}x)\n"
+        f"export {axis}={smallest}\n"
+        f"exec {repro_path} {smallest}\n"
+    )
+    os.chmod(repro_min_path, 0o755)
+
+    log_text = render_log(stats, header_label)
+    log_text += f"\nperf-min-workload={axis}={smallest}\n"
+    log_path.write_text(log_text)
+
+    cap_note = " [cap-reached]" if stats.cap_reached else ""
+    return True, f"smallest_regressing={axis}={smallest} probes={stats.probes}{cap_note}"
+
+
 def cmd_bug(argv: list[str]) -> int:
     flags = _parse_bug_args(argv)
     symptom = flags["symptom"]
