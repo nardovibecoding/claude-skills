@@ -27,10 +27,16 @@ def main() -> int:
 
     for r in rows:
         # build a parsed-message dict matching what _classify expects
+        # extract bare email from "Name <addr@host>" form
+        from_full = r["from"]
+        if "<" in from_full and ">" in from_full:
+            from_addr = from_full.split("<", 1)[1].rstrip(">").strip().lower()
+        else:
+            from_addr = from_full.strip().lower()
         parsed = {
-            "from": r["from"],
+            "from_addr": from_addr,
             "subject": r["subject"],
-            "body": r["snippet"],
+            "body_raw": r["snippet"],
             "headers": (
                 [{"name": "List-Unsubscribe", "value": "<x>"}]
                 if r.get("has_list_unsubscribe", "").upper() == "TRUE"
