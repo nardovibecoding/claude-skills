@@ -11,7 +11,7 @@ Bernard ⭐ tags = the 30 most likely from his usage profile (HK builder, tradin
 ## Historical art movements
 
 ### art-deco ⭐
-- Aliases: art deco, deco, gatsby, jazz age, 1920s, roaring twenties, roaring 20s, chrysler building, empire state, great gatsby, geometric gilded, miami deco, deco poster, prohibition era
+- Aliases: art deco, art-deco, artdeco, deco, gatsby, jazz age, 1920s, roaring twenties, roaring 20s, chrysler building, empire state, great gatsby, geometric gilded, miami deco, deco poster, prohibition era
 - Palette: #0B0B0F bg · #D4AF37 gold · #1B2A41 navy · #F5F0E1 cream · #B22222 oxblood
 - Typography: ITC Avant Garde Gothic / Futura (geometric sans display); Bodoni or Didot for serif counter
 - Shape: stepped pyramids, sunburst, chevron, fluted columns, hairline gold rules
