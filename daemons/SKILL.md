@@ -177,6 +177,6 @@ fi
 | symptom | cause | recovery |
 |---|---|---|
 | `ERROR: no bundle assembled` | collector.py crashed or pending empty after fire | `tail ~/inbox/_logs/summary-collector.err` |
-| timed out waiting on VPS | Hel or London SSH down | `ssh hel uptime` / `ssh pm@london uptime`; rerun /bigd after fixing |
+| timed out waiting on VPS | Hel or London SSH down | `ssh hel uptime` / `ssh pm@london uptime`; rerun /daemons after fixing |
 | bundle has only Mac (12 missing) | VPS daemons errored | `ssh hel "tail ~/.cache/bigd/bigd_parallel.log"` |
 | panel renders with 0 actions | working as intended (clean day) — not a failure | n/a |
