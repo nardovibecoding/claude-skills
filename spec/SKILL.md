@@ -96,8 +96,9 @@ Print only the formatted summary. Do not narrate the steps. Do not paste the ori
 
 ## Failure modes
 
-- spec file missing → list 5 closest fuzzy matches + "pick one with `/spec <slug>`"
-- ~/.ship dir missing → "no ship artifacts on this machine yet"
+- bare /spec, no specs in ~/.ship/ → print "no ship specs found in ~/.ship/" and stop
+- /spec <slug>, slug missing → list 5 closest fuzzy matches + "pick one with `/spec <slug>`"
+- ~/.ship dir missing entirely → "no ship artifacts on this machine yet"
 - spec file present but empty/malformed → print "spec exists but unreadable: <path>" and stop
 
 </spec>
