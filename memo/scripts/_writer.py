@@ -93,13 +93,6 @@ def write_memo(
 
     ts = datetime.now()
     base = ts.strftime("%Y-%m-%d_%H%M%S")
-    filename = f"{base}{suffix}.md"
-    path = PENDING_DIR / filename
-    if path.exists():
-        # Microsecond suffix to break collisions (R2 in spec).
-        filename = f"{base}_{ts.strftime('%f')}{suffix}.md"
-        path = PENDING_DIR / filename
-
     fm_lines = [
         "---",
         f"from: {channel}",
@@ -113,9 +106,26 @@ def write_memo(
     fm_lines.append("---")
     content = "\n".join(fm_lines) + "\n" + (body.rstrip() + "\n")
 
+    # Filename collision-resolution must happen INSIDE the lock — otherwise
+    # two concurrent writers can both check `not path.exists()` simultaneously
+    # and clobber each other.
     lock_fd = _acquire_writer_lock()
     try:
-        with path.open("w", encoding="utf-8") as f:
+        filename = f"{base}{suffix}.md"
+        path = PENDING_DIR / filename
+        if path.exists():
+            # Microsecond suffix breaks intra-second collisions (R2 in spec).
+            filename = f"{base}_{ts.strftime('%f')}{suffix}.md"
+            path = PENDING_DIR / filename
+            # Defensive: if even microsecond collides (vanishingly rare), use os.O_EXCL loop.
+            attempt = 0
+            while path.exists() and attempt < 100:
+                attempt += 1
+                filename = f"{base}_{ts.strftime('%f')}_{attempt}{suffix}.md"
+                path = PENDING_DIR / filename
+        # Use exclusive create to slam the door on any racy lookup we missed.
+        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
     finally:
         _release_writer_lock(lock_fd)
