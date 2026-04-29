@@ -7,16 +7,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
 
-from _lib.minimise import (
+from minimise import (  # type: ignore
     Fingerprint,
     MinimiseStats,
+    ProbeResult,
     bsearch_workload,
     ddmin,
     ddmin_lines,
     flaky_probe,
-    precheck_deterministic,
     render_log,
 )
 
