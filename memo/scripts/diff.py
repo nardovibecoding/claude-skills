@@ -73,7 +73,7 @@ def since_diff(days: int, include_archived: bool = True) -> dict:
     if not include_archived:
         rows = [r for r in rows if r.get("status") != "done"]
 
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
     in_window: list[dict] = []
     before_window: list[dict] = []
