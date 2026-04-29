@@ -74,3 +74,89 @@ Exit codes: 0=within-budget, 1=regression|leak|hot-loop, 2=invalid, 3=inconclusi
 - `~/.claude/rules/ship.md` § Observations log
 - master plan §3 row "Performance"
 - `~/.claude/skills/ship/phases/bot/04-land.md` step 7 (baseline metrics)
+
+---
+
+## UI / native-app perf addendum (added 2026-04-29 from VibeIsland session)
+
+When the symptom is "UI is jerky / animation stutters / button click drops / tab switch freezes" rather than "scan-loop hot / mem grows": classic server-perf metrics (scan rate, fill latency) DO NOT apply. Use this addendum.
+
+### Distinct symptom shapes
+
+| symptom | likely class |
+|---|---|
+| sustained CPU >5% at idle | classic hot-loop — use top of file |
+| **CPU 0% but UI jerks** | SwiftUI invalidation cascade or main-thread block during animation |
+| **button click does nothing** | main thread blocked >100ms when click arrived (AppKit coalesces dropped) |
+| **animation frame drops** | view re-layout during animation; setContent fired pre-animation; or implicit Charts animation |
+| **tab switch freeze** | onAppear cascades trigger N concurrent loads on main |
+| **app self-quits silently** | search for `NSApp.terminate` callers; small icons next to Refresh button = mis-click trap |
+
+### Sample DURING action, not idle (HARD RULE)
+
+A 30s sample over an idle window will show low CPU even when the app is jerky. The cost is bursty during interactions. Workflow:
+
+1. Tell user: "do rapid <action> for 30s"
+2. `sample <pid> 30 -file /tmp/<slug>-debug.txt`
+3. Analyze module breakdown:
+   - high `libicucore` → Formatter init storms; cache as `static let`
+   - high `Foundation` + `String.contents` → sync file I/O on main; off-load via DispatchQueue
+   - high `SwiftUI` / `SwiftUICore` → re-render cascade; reduce @Published surface or LazyVStack
+   - high `libsystem_kernel` (kevent / wait) → blocked on Process()/ssh; parallelize or move off main
+
+### Disable-and-retry isolation
+
+When suspect is a heavy framework (Charts, AVKit, MapKit, WebKit), replace with placeholder Text first:
+
+```swift
+// [INTERIM <date>] disabled to confirm bottleneck
+Text("[<framework> disabled — N items]")
+```
+
+If symptom resolves → confirm. Then ship permanent (e.g., hand-drawn `Path` sparkline for Charts).
+
+### Multi-detector inventory (perf-daemon-style scan)
+
+Run as 6 detectors over `Sources/`:
+
+1. **timer_inventory** — every `Timer.scheduledTimer` + `Timer.publish` + `Combine.timer`. Capture cadence, queue, payload.
+2. **main_thread_blockers** — `Process()`, `String(contentsOfFile:)`, `JSONSerialization`, ssh, *Formatter() reachable from main thread.
+3. **polling_dedup** — same path read by ≥2 callers (e.g. `pipeline_graph.json` read by HelTabView + LondonTabView).
+4. **formatter_alloc** — every `*Formatter()` allocation per render frame.
+5. **queue_contention** — serial-queue work that mutates @Published → SwiftUI invalidation rate.
+6. **live_sample** — sample during 3 distinct windows: idle, during typical timer fire, during user interaction.
+
+Each detector outputs `findings.md` with `[cited file:line]` evidence + severity. Rank by `impact × user-visibility`.
+
+### @Published cascade audit
+
+A 5s timer that calls `self.states = next` on `@Published var states` triggers SwiftUI invalidation across every view that observes the store. With N observers + 5s tick = 0.2N invalidations/sec at idle. During animations, this storm causes frame drops even when no single view is heavy.
+
+Mitigations:
+- Widen tick interval (5s → 15s)
+- Diff-aware update (only assign if changed)
+- Split monolithic store into per-domain stores so observers subscribe narrowly
+
+### Animation pre-content trap (HARD RULE)
+
+When a window resize animates 0.28s+, do NOT call `setContent(...)` BEFORE `reposition(animate: true)`. SwiftUI lays out new content at OLD frame size, then re-lays out on every animation tick (~17 frames at 60fps). Defer content swap to animation completion handler. Mirror collapse-pattern symmetry for expand.
+
+### Stale-build verification (HARD RULE)
+
+If both a packaged `.app` (`/Applications/<Name>.app`) and a debug build (`.build/debug/<Name>`) exist:
+
+```bash
+ps -p $(pgrep -f <Name> | head -1) -o command
+```
+
+Verify which binary is running BEFORE concluding patches did/didn't help. The packaged `.app` may auto-launch on login or via Dock and run stale code that ignores all live-edit patches. Rebuild + replace the `.app` after patches stabilize.
+
+### Quit-button-mis-click trap
+
+Small icons (≤24px) next to other clickable buttons in app headers are mis-click vectors. If `launchctl print gui/$(id -u)/<label>` shows `runs=N` where N >> manual restart count, suspect: (a) crash loop (check `last exit code`), (b) silent `NSApp.terminate` from accidental click. Add confirmation alert to all destructive UI buttons.
+
+### Cross-refs (UI-perf-specific)
+
+- Apple sample / time profiler in Instruments for deeper drill (when `sample` cmd output ambiguous)
+- `~/.ship/vibeisland-event-driven/experiments/perf-scan-findings.md` — example of detector output
+- `~/NardoWorld/atoms/vibeisland-charts-framework-perf-2026-04-29.md` — Charts-as-jerk-source canonical lesson
