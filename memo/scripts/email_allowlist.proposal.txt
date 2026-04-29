@@ -1,0 +1,11 @@
+# Bootstrap proposal generated 2026-04-29 19:49 HKT
+# Source: 90d Sent folder, 20 messages scanned
+# Review each line; uncomment to add to email_allowlist.txt
+# Then `cat email_allowlist.proposal.txt >> email_allowlist.txt` after manual review
+
+# === domains (>=3 distinct addresses written) ===
+# @hertz.com   (22 msgs across 10 addresses: care@, customer-relations-es@, customer-relations@)
+# @gmail.com   (12 msgs across 3 addresses: alexandretang81@, berlin.ng@, fromedwin@)
+
+# === individual emails (>=2 msgs, domain not above) ===
+# support@vestiairecollective.com   (6 msgs)
