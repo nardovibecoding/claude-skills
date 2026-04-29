@@ -79,6 +79,7 @@ def _list_sent_message_ids(service) -> list[str]:
 
 def _extract_recipients(service, msgid: str) -> list[str]:
     """Fetch To: + Cc: headers; return list of normalized email addresses."""
+    msg: dict = {}
     for attempt in range(2):
         try:
             msg = service.users().messages().get(
