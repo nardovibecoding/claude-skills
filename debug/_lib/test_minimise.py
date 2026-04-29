@@ -146,7 +146,6 @@ class TestBsearchWorkload(unittest.TestCase):
 class TestFlakyProbe(unittest.TestCase):
 
     def test_majority_oracle(self):
-        from _lib.minimise import ProbeResult
         # raw_probe returns fail 7/10 times deterministically
         counter = {"i": 0}
 
