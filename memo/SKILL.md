@@ -83,41 +83,42 @@ Inspect `$ARG` (the verb argument after `/memo`):
    cd ~/telegram-claude-bot && git log --all --oneline --grep='memo:' -10
    ```
 
-4. **Tag-filter mode** (`/memo #tag`):
-   ```bash
-   python3 - "$TAG" <<'PY'
-   import sys, json, datetime
-   sys.path.insert(0, f"{__import__('os').path.expanduser('~')}/.claude/skills/memo/scripts")
-   from index import query_index, build_index, INDEX_FILE
+4. **Tag-filter mode** (`/memo #tag`) — note: bash block is left-aligned (column 0) on purpose so the embedded python heredoc preserves indentation:
 
-   tag = sys.argv[1].strip().lower().lstrip("#")
-   if not INDEX_FILE.exists():
-       build_index()  # lazy init from S1
+```bash
+python3 - "$TAG" <<'PY'
+import sys, os, datetime
+sys.path.insert(0, os.path.expanduser("~/.claude/skills/memo/scripts"))
+from index import query_index, build_index, INDEX_FILE
 
-   rows = query_index(tags=[tag], limit=5)
-   if not rows:
-       print(f"(no memos with tag #{tag})")
-       sys.exit(0)
+tag = sys.argv[1].strip().lower().lstrip("#")
+if not INDEX_FILE.exists():
+    build_index()  # lazy init from S1
 
-   def hkt(ts: str) -> str:
-       # ts shape "YYYY-MM-DD HH:MM:SS" — treat as UTC, +8 to HKT
-       try:
-           dt = datetime.datetime.strptime(ts[:19], "%Y-%m-%d %H:%M:%S")
-       except ValueError:
-           return ts[:16]
-       dt += datetime.timedelta(hours=8)
-       return dt.strftime("%m-%d %H:%M:%S")
+rows = query_index(tags=[tag], limit=5)
+if not rows:
+    print(f"(no memos with tag #{tag})")
+    sys.exit(0)
 
-   print("| When (HKT)        | Status  | Tags                 | Content |")
-   print("|-------------------|---------|----------------------|---------|")
-   for r in rows:
-       when = hkt(r.get("ts", ""))
-       status = "PENDING" if r.get("status") == "pending" else "done"
-       tags = ",".join(f"#{t}" for t in r.get("tags") or [])
-       body = (r.get("body_preview") or "").replace("|", "\\|")[:60]
-       print(f"| {when:<17} | {status:<7} | {tags:<20} | {body} |")
-   PY
-   ```
+def hkt(ts: str) -> str:
+    # ts shape "YYYY-MM-DD HH:MM:SS" — treat as UTC, +8 to HKT
+    try:
+        dt = datetime.datetime.strptime(ts[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return ts[:16]
+    dt += datetime.timedelta(hours=8)
+    return dt.strftime("%m-%d %H:%M:%S")
+
+print("| When (HKT)        | Status  | Tags                 | Content |")
+print("|-------------------|---------|----------------------|---------|")
+for r in rows:
+    when = hkt(r.get("ts", ""))
+    status = "PENDING" if r.get("status") == "pending" else "done"
+    tags = ",".join(f"#{t}" for t in r.get("tags") or [])
+    body = (r.get("body_preview") or "").replace("|", "\\|")[:60]
+    print(f"| {when:<17} | {status:<7} | {tags:<20} | {body} |")
+PY
+```
 
 ## Notes
 
