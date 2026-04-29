@@ -4,3 +4,7 @@ __pycache__/
 .transformers-cache/
 *.cache
 node_modules/
+
+# memo-v2 S5 — Gmail OAuth secrets (NEVER commit)
+memo/scripts/.gmail_token.json
+memo/scripts/.gmail_client_secrets.json
