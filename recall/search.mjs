@@ -46,9 +46,16 @@ const noRerank = args.includes("--no-rerank");
 const noHyde = args.includes("--no-hyde");
 const noPrf = args.includes("--no-prf");
 const noLog = args.includes("--no-log");
-const query = args.filter(a => !a.startsWith("--"))[0];
+// --weights '<json>' overrides loadWeights() (used by cube-classifier wiring)
+let weightsOverride = null;
+const weightsIdx = args.findIndex(a => a === "--weights");
+if (weightsIdx !== -1 && args[weightsIdx + 1]) {
+  try { weightsOverride = JSON.parse(args[weightsIdx + 1]); }
+  catch (e) { console.error(`[search.mjs] --weights parse failed: ${e.message}; using default`); }
+}
+const query = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--weights")[0];
 if (!query) {
-  console.error("Usage: node search.mjs \"<query>\" [--json] [--no-rerank|--no-hyde|--no-prf|--no-log]");
+  console.error("Usage: node search.mjs \"<query>\" [--json] [--no-rerank|--no-hyde|--no-prf|--no-log] [--weights '<json>']");
   process.exit(1);
 }
 
