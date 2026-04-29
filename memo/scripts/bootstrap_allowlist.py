@@ -51,6 +51,7 @@ def _list_sent_message_ids(service) -> list[str]:
     ids: list[str] = []
     page_token = None
     while len(ids) < MAX_MESSAGES:
+        resp: dict = {}
         for attempt in range(2):
             try:
                 resp = service.users().messages().list(
