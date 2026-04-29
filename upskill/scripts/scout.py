@@ -1,24 +1,30 @@
 #!/usr/bin/env python3
 """
-/upskill scout — external candidate sweep via gh CLI.
+/upskill scout — lens-aware external candidate sweep via gh CLI.
 
-Source plan: ~/.ship/upskill/goals/02-plan.md §S4
-Source spec: ~/.ship/upskill/goals/01-spec.md §2 step 1, §5 R-Scout-Silent-Fail
+Source plan: ~/.ship/upskill/goals/02-plan.md v2 §S2
+Source spec: ~/.ship/upskill/goals/01-spec.md v2 §2 step 1, §5 R-Scout-Silent-Fail
+
+Lens-aware (v2): consumes lens JSON from lens_resolve.py.
+  - Standard mode: lens.keywords grouped (≤5 per gh search) + 1 call per gh_topic.
+  - Menu mode (lens.menu_items present): one gh search per item, ≤5 items per call,
+    priority-sorted (high before low).
 
 Three valid outcomes per spec §5:
   - candidates returned (>=1)
   - scout_degraded=true (>=1 gh call failed, others may have succeeded)
-  - scout_skipped="rate_limit_low" (pre-flight aborted)
+  - scout_skipped="rate_limit_low"|"rate_limit_too_low" (pre-flight aborted)
 
 Silent empty result is FORBIDDEN — always emit at least one of the above.
 
-NO LLM in v1. Rule-based filter only. Token budget <5K.
+NO LLM. Rule-based filter only. Token budget <5K.
 """
 from __future__ import annotations
 
 import argparse
 import glob
 import json
+import math
 import os
 import re
 import subprocess
@@ -26,31 +32,30 @@ import sys
 from pathlib import Path
 from typing import Any
 
-DEFAULT_TOPICS = ["claude-code", "ai-agent", "mcp", "llm-cli"]
-RATE_LIMIT_MIN = 100
-TOPIC_LIMIT = 10
+RATE_LIMIT_MIN = 100  # v1 floor; v2 promotes to dynamic per-lens via 2x guard
+KEYWORD_GROUP_SIZE = 5
+MENU_ITEMS_PER_CALL = 5
+SEARCH_LIMIT = 30
+CANDIDATES_HARD_CAP = 200
 SUMMARY_MAX = 200
 INSTALLED_GLOB = os.path.expanduser("~/.claude/skills/*/SKILL.md")
 GITHUB_URL_RE = re.compile(r"github\.com/([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+)")
+PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 def run_gh(args: list[str], verbose: bool = False) -> tuple[int, str, str]:
-    """Run gh; return (rc, stdout, stderr_snippet)."""
     if verbose:
         print(f"[gh] {' '.join(args)}", file=sys.stderr)
     try:
-        r = subprocess.run(
-            ["gh", *args], capture_output=True, text=True, timeout=20
-        )
+        r = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=30)
         return r.returncode, r.stdout, r.stderr[:200]
     except subprocess.TimeoutExpired:
-        return 124, "", "timeout 20s"
+        return 124, "", "timeout 30s"
     except FileNotFoundError:
         return 127, "", "gh not found"
 
 
 def load_installed_repos() -> set[str]:
-    """Set of 'owner/name' lowercase strings already referenced in installed SKILL.md files."""
     seen: set[str] = set()
     for fp in glob.glob(INSTALLED_GLOB):
         try:
@@ -70,11 +75,42 @@ def trunc(s: str | None, n: int = SUMMARY_MAX) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def scout_topic(
-    topic: str, installed: set[str], errors: list[dict], verbose: bool
-) -> tuple[list[dict], int]:
-    """Return (candidates, call_count) for one topic."""
-    src = f"github_topic_{topic}"
+def chunked(lst: list, n: int) -> list[list]:
+    return [lst[i : i + n] for i in range(0, len(lst), n)]
+
+
+def match_keywords(text: str, keywords: list[str]) -> list[str]:
+    """Case-insensitive substring match of keywords against text."""
+    low = (text or "").lower()
+    return [k for k in keywords if k.lower() in low]
+
+
+def gh_search_repos(query: str, verbose: bool) -> tuple[int, list[dict], str]:
+    """Returns (rc, rows, err_snippet)."""
+    rc, out, err = run_gh(
+        [
+            "search",
+            "repos",
+            query,
+            "--sort",
+            "stars",
+            "--limit",
+            str(SEARCH_LIMIT),
+            "--json",
+            "fullName,description,stargazersCount,url,updatedAt,language",
+        ],
+        verbose,
+    )
+    if rc != 0:
+        return rc, [], err.strip()
+    try:
+        rows = json.loads(out or "[]")
+    except json.JSONDecodeError as e:
+        return 1, [], f"json:{e}"
+    return 0, rows, ""
+
+
+def gh_search_topic(topic: str, verbose: bool) -> tuple[int, list[dict], str]:
     rc, out, err = run_gh(
         [
             "search",
@@ -84,200 +120,266 @@ def scout_topic(
             "--sort",
             "stars",
             "--limit",
-            str(TOPIC_LIMIT),
+            str(SEARCH_LIMIT),
             "--json",
-            "fullName,description,stargazersCount,url,updatedAt",
+            "fullName,description,stargazersCount,url,updatedAt,language",
         ],
         verbose,
     )
     if rc != 0:
-        errors.append({"source": src, "error": f"{rc}+{err.strip()}"})
-        return [], 1
+        return rc, [], err.strip()
     try:
         rows = json.loads(out or "[]")
     except json.JSONDecodeError as e:
-        errors.append({"source": src, "error": f"json:{e}"})
-        return [], 1
-    cands = []
-    for r in rows:
-        full = (r.get("fullName") or "").lower()
-        if full in installed:
-            continue
-        cands.append(
-            {
-                "source": src,
-                "name": r.get("fullName"),
-                "url": r.get("url"),
-                "stars": r.get("stargazersCount", 0),
-                "updated_at": r.get("updatedAt"),
-                "summary": trunc(r.get("description")),
-            }
-        )
-    return cands, 1
+        return 1, [], f"json:{e}"
+    return 0, rows, ""
 
 
-def scout_anthropic_releases(
-    errors: list[dict], verbose: bool
-) -> tuple[list[dict], int]:
-    src = "anthropic_releases"
-    rc, out, err = run_gh(
-        [
-            "api",
-            "repos/anthropics/claude-code/releases?per_page=5",
-            "--jq",
-            ".[]|{tag:.tag_name,name:.name,published_at:.published_at,url:.html_url}",
-        ],
-        verbose,
-    )
+def to_candidate(
+    row: dict, keywords: list[str], source: str, topics_field: list[str] | None = None
+) -> dict:
+    full = row.get("fullName") or ""
+    desc = row.get("description") or ""
+    matched = match_keywords(f"{full} {desc}", keywords)
+    return {
+        "id": full.lower().replace("/", "-"),
+        "name": full,
+        "url": row.get("url"),
+        "stars": row.get("stargazersCount", 0),
+        "description": trunc(desc),
+        "language": row.get("language"),
+        "pushed_at": row.get("updatedAt"),
+        "topics": topics_field or [],
+        "matched_keywords": matched,
+        "source": source,
+    }
+
+
+def preflight_rate_limit(verbose: bool) -> tuple[int | None, str]:
+    """Return (remaining, err). remaining=None on failure."""
+    rc, out, err = run_gh(["api", "rate_limit"], verbose)
     if rc != 0:
-        errors.append({"source": src, "error": f"{rc}+{err.strip()}"})
-        return [], 1
-    cands = []
-    for line in (out or "").strip().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rel = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        cands.append(
-            {
-                "source": src,
-                "name": f"anthropics/claude-code@{rel.get('tag')}",
-                "url": rel.get("url"),
-                "stars": 0,
-                "updated_at": rel.get("published_at"),
-                "summary": trunc(rel.get("name")),
-            }
-        )
-    return cands, 1
-
-
-def scout_awesome_skills(
-    installed: set[str], errors: list[dict], verbose: bool
-) -> tuple[list[dict], int]:
-    src = "awesome_skills"
-    rc, out, err = run_gh(
-        [
-            "api",
-            "repos/anthropics/skills/contents/skills",
-            "--jq",
-            ".[]|{name:.name,url:.html_url,type:.type}",
-        ],
-        verbose,
+        return None, f"{rc}+{err.strip()}"
+    try:
+        body = json.loads(out)
+    except json.JSONDecodeError as e:
+        return None, f"json:{e}"
+    # Search API has its own quota — use search.remaining since we use gh search.
+    remaining = (
+        body.get("resources", {}).get("search", {}).get("remaining")
     )
-    if rc != 0:
-        errors.append({"source": src, "error": f"{rc}+{err.strip()}"})
-        return [], 1
-    cands = []
-    for line in (out or "").strip().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            it = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if it.get("type") != "dir":
-            continue
-        full = f"anthropics/skills#{it.get('name', '').lower()}"
-        if full in installed:
-            continue
-        cands.append(
-            {
-                "source": src,
-                "name": f"anthropics/skills/{it.get('name')}",
-                "url": it.get("url"),
-                "stars": 0,
-                "updated_at": None,
-                "summary": trunc(f"Anthropic catalog skill: {it.get('name')}"),
-            }
-        )
-    return cands, 1
+    if remaining is None:
+        remaining = body.get("rate", {}).get("remaining", 0)
+    return remaining, ""
+
+
+def plan_standard(lens: dict) -> tuple[list[list[str]], list[str], int]:
+    """Return (keyword_groups, gh_topics, expected_calls)."""
+    keywords = list(lens.get("keywords", []))
+    gh_topics = list(lens.get("gh_topics", []))
+    groups = chunked(keywords, KEYWORD_GROUP_SIZE)
+    expected = len(groups) + len(gh_topics)
+    return groups, gh_topics, expected
+
+
+def plan_menu(lens: dict) -> tuple[list[list[dict]], int]:
+    """Return (item_batches sorted high→low priority, expected_calls)."""
+    items = list(lens.get("menu_items", []))
+    items.sort(key=lambda it: PRIORITY_ORDER.get(it.get("priority", "medium"), 1))
+    batches = chunked(items, MENU_ITEMS_PER_CALL)
+    return batches, math.ceil(len(items) / MENU_ITEMS_PER_CALL)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--lens",
+        required=True,
+        help="path to lens JSON file (output of lens_resolve.py)",
+    )
     ap.add_argument("--out", required=True)
-    ap.add_argument("--dry-run", action="store_true",
-                    help="run only first topic + skip releases/awesome")
-    ap.add_argument("--topics", default=",".join(DEFAULT_TOPICS))
+    ap.add_argument(
+        "--mock-rate-limit",
+        type=int,
+        default=None,
+        help="(test only) skip gh api rate_limit; use this remaining instead",
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="skip gh search calls; emit empty candidates + reason='dry_run'",
+    )
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
+    lens_path = Path(args.lens).expanduser()
+    if not lens_path.exists():
+        print(
+            json.dumps({"error": f"lens file not found: {lens_path}"}),
+            file=sys.stderr,
+        )
+        return 1
+    lens = json.loads(lens_path.read_text())
+    lens_name = lens.get("name", "unknown")
+    is_menu_mode = bool(lens.get("menu_items"))
+
     out: dict[str, Any] = {
-        "rate_limit_remaining": None,
-        "scout_skipped": None,
-        "scout_degraded": False,
+        "lens_name": lens_name,
         "candidates": [],
+        "scout_degraded": False,
+        "scout_skipped": None,
+        "rate_limit_remaining": None,
+        "calls_made": 0,
+        "expected_calls": 0,
         "errors": [],
-        "call_count": 0,
-        "sources": [],
+        "mode": "menu" if is_menu_mode else "standard",
     }
 
-    # Pre-flight rate limit
-    rc, body, err = run_gh(["api", "rate_limit"], args.verbose)
-    out["call_count"] += 1
-    if rc != 0:
-        out["errors"].append({"source": "rate_limit", "error": f"{rc}+{err.strip()}"})
-        out["scout_degraded"] = True
-        out["rate_limit_remaining"] = -1
+    # Plan
+    if is_menu_mode:
+        batches, expected = plan_menu(lens)
+        out["expected_calls"] = expected
     else:
-        try:
-            rl = json.loads(body)
-            remaining = (
-                rl.get("resources", {}).get("core", {}).get("remaining")
-                or rl.get("rate", {}).get("remaining")
-                or 0
-            )
-            out["rate_limit_remaining"] = remaining
-            if remaining < RATE_LIMIT_MIN:
-                out["scout_skipped"] = "rate_limit_low"
-                Path(args.out).write_text(json.dumps(out, indent=2))
-                print(json.dumps({"skipped": True, "remaining": remaining}))
-                return 0
-        except json.JSONDecodeError as e:
-            out["errors"].append({"source": "rate_limit", "error": f"json:{e}"})
-            out["scout_degraded"] = True
+        groups, gh_topics, expected = plan_standard(lens)
+        out["expected_calls"] = expected
 
-    topics = [t.strip() for t in args.topics.split(",") if t.strip()]
+    # Pre-flight rate-limit (BEFORE any gh search)
+    if args.mock_rate_limit is not None:
+        remaining = args.mock_rate_limit
+    else:
+        remaining, err = preflight_rate_limit(args.verbose)
+        out["calls_made"] += 1
+        if remaining is None:
+            out["errors"].append({"source": "rate_limit", "error": err})
+            out["scout_degraded"] = True
+            remaining = 0
+    out["rate_limit_remaining"] = remaining
+
+    # Rate-limit guard
+    if expected > 0 and remaining < expected:
+        out["scout_skipped"] = "rate_limit_too_low"
+        out["expected_calls"] = expected
+        Path(args.out).expanduser().write_text(json.dumps(out, indent=2))
+        print(
+            json.dumps(
+                {"skipped": "rate_limit_too_low", "remaining": remaining, "expected": expected}
+            )
+        )
+        return 0
+
+    halve = expected > 0 and remaining < (expected * 2)
+    if halve:
+        out["scout_skipped"] = "rate_limit_low"
+        if is_menu_mode:
+            half = max(1, math.ceil(len(batches) / 2))
+            batches = batches[:half]
+            out["expected_calls"] = sum(len(b) for b in [batches])  # placeholder
+            out["expected_calls"] = len(batches)
+        else:
+            half_g = max(1, math.ceil(len(groups) / 2))
+            groups = groups[:half_g]
+            half_t = max(0, math.ceil(len(gh_topics) / 2))
+            gh_topics = gh_topics[:half_t]
+            out["expected_calls"] = len(groups) + len(gh_topics)
+
     if args.dry_run:
-        topics = topics[:1]
+        out["scout_skipped"] = out["scout_skipped"] or "dry_run"
+        Path(args.out).expanduser().write_text(json.dumps(out, indent=2))
+        print(
+            json.dumps(
+                {
+                    "candidates": 0,
+                    "skipped": out["scout_skipped"],
+                    "remaining": remaining,
+                    "expected": out["expected_calls"],
+                }
+            )
+        )
+        return 0
 
     installed = load_installed_repos()
+    keywords_for_match = list(lens.get("keywords", []))
+    raw_candidates: list[dict] = []
 
-    # Topic searches
-    for t in topics:
-        out["sources"].append(f"github_topic_{t}")
-        cands, n = scout_topic(t, installed, out["errors"], args.verbose)
-        out["candidates"].extend(cands)
-        out["call_count"] += n
+    if is_menu_mode:
+        # Menu mode: one gh search per item, batches purely structural for cap calc.
+        for batch in batches:
+            for item in batch:
+                item_keywords = item.get("keywords") or []
+                if not item_keywords:
+                    continue
+                query = " OR ".join(item_keywords)
+                rc, rows, err = gh_search_repos(query, args.verbose)
+                out["calls_made"] += 1
+                src = f"menu_item:{item.get('id', item.get('name', '?'))}"
+                if rc != 0:
+                    out["errors"].append({"source": src, "error": f"{rc}+{err}"})
+                    out["scout_degraded"] = True
+                    continue
+                for r in rows:
+                    raw_candidates.append(
+                        to_candidate(r, item_keywords + keywords_for_match, src)
+                    )
+    else:
+        for group in groups:
+            if not group:
+                continue
+            query = " OR ".join(group)
+            rc, rows, err = gh_search_repos(query, args.verbose)
+            out["calls_made"] += 1
+            src = f"keywords:{','.join(group)[:60]}"
+            if rc != 0:
+                out["errors"].append({"source": src, "error": f"{rc}+{err}"})
+                out["scout_degraded"] = True
+                continue
+            for r in rows:
+                raw_candidates.append(to_candidate(r, keywords_for_match, src))
+        for topic in gh_topics:
+            rc, rows, err = gh_search_topic(topic, args.verbose)
+            out["calls_made"] += 1
+            src = f"gh_topic:{topic}"
+            if rc != 0:
+                out["errors"].append({"source": src, "error": f"{rc}+{err}"})
+                out["scout_degraded"] = True
+                continue
+            for r in rows:
+                raw_candidates.append(to_candidate(r, keywords_for_match, src))
 
-    # Anthropic releases (skip in dry-run)
-    if not args.dry_run:
-        out["sources"].append("anthropic_releases")
-        cands, n = scout_anthropic_releases(out["errors"], args.verbose)
-        out["candidates"].extend(cands)
-        out["call_count"] += n
+    # Dedup by name (case-insensitive), exclude installed.
+    seen: dict[str, dict] = {}
+    for c in raw_candidates:
+        key = (c.get("name") or "").lower()
+        if not key:
+            continue
+        if key in installed:
+            continue
+        if key in seen:
+            # merge matched_keywords
+            prev = seen[key]
+            prev_set = set(prev.get("matched_keywords", []))
+            prev_set.update(c.get("matched_keywords", []))
+            prev["matched_keywords"] = sorted(prev_set)
+            continue
+        seen[key] = c
 
-        out["sources"].append("awesome_skills")
-        cands, n = scout_awesome_skills(installed, out["errors"], args.verbose)
-        out["candidates"].extend(cands)
-        out["call_count"] += n
+    candidates = list(seen.values())
+    candidates = candidates[:CANDIDATES_HARD_CAP]
+    out["candidates"] = candidates
 
     if out["errors"]:
         out["scout_degraded"] = True
 
-    Path(args.out).write_text(json.dumps(out, indent=2))
+    Path(args.out).expanduser().write_text(json.dumps(out, indent=2))
     print(
         json.dumps(
             {
-                "candidates": len(out["candidates"]),
+                "lens_name": lens_name,
+                "candidates": len(candidates),
                 "degraded": out["scout_degraded"],
-                "rate_limit_remaining": out["rate_limit_remaining"],
-                "call_count": out["call_count"],
-                "errors": len(out["errors"]),
+                "skipped": out["scout_skipped"],
+                "rate_limit_remaining": remaining,
+                "calls_made": out["calls_made"],
+                "expected_calls": out["expected_calls"],
             }
         )
     )
