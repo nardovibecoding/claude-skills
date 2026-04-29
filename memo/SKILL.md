@@ -2,8 +2,8 @@
 name: memo
 description: |
   Read + write local memo store (TG admin_bot + terminal scribble; email channel S5).
-  Bare `/memo` shows the 5 newest. `/memo #tag` filters by tag. `/memo <body>` scribbles a new terminal memo (parses #tag tokens). search/--since modes return placeholders until later slices land.
-  Triggers: "/memo", "memo this is a note #idea", "/memo brainstorm dashboard #idea", "/memo #drift", "/memo #idea", "/memo #stale-ref", "/memo #followup", "last memo", "check memo", "did my memo save", "show memos", "recheck memo".
+  Bare `/memo` shows the 5 newest. `/memo #tag` filters by tag. `/memo search <kw>` full-text searches memo bodies (case-insensitive substring). `/memo <body>` scribbles a new terminal memo (parses #tag tokens). --since mode is a placeholder until S7 lands.
+  Triggers: "/memo", "memo this is a note #idea", "/memo brainstorm dashboard #idea", "/memo #drift", "/memo #idea", "/memo #stale-ref", "/memo #followup", "/memo search foo", "/memo search rename refs", "last memo", "check memo", "did my memo save", "show memos", "recheck memo".
 user_invocable: true
 ---
 
