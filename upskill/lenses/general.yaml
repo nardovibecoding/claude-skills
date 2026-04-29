@@ -1,0 +1,14 @@
+name: general
+keywords:
+  - claude code
+  - agent skill
+  - llm tool
+  - ai workflow
+gh_topics: [claude-code]
+scoring_weights:
+  stars: 0.4
+  recency: 0.2
+  keyword_fit: 0.3
+  language_match: 0.1
+integration_cost_model: skills
+overlay_sources: []
