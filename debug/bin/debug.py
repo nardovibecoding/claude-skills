@@ -559,6 +559,35 @@ flags:   quick={quick} no_chain={no_chain}
         os.chmod(repro, 0o755)
         _bug_step(1, "REPRODUCE", f"repro template at {repro} — populate then re-run")
 
+    # Step 1.5 — MINIMISE (pocock/skills diagnose)
+    repro_min = exp_dir / "repro-min.sh"
+    minimise_log = state_dir / "minimise-log.md"
+    if dry:
+        repro_min.write_text("#!/usr/bin/env bash\n# dry-run: minimise skipped\nexit 0\n")
+        minimise_log.write_text(f"# minimise log — {symptom}\n\ndry-run\n")
+        _bug_step(1.5, "MINIMISE", "--dry-run: skipped minimise")
+    else:
+        if not repro_min.exists():
+            repro_min.write_text(
+                "#!/usr/bin/env bash\n"
+                "# Minimised repro — start as a copy of repro.sh, then strip until smallest failing case.\n"
+                f"# Strategy: remove env vars / data rows / deps / setup steps one at a time;\n"
+                "# re-run after each strip; KEEP the strip if the bug still reproduces, REVERT if it doesn't.\n"
+                "# Halt when no further strip leaves the failure intact.\n"
+                "exit 1\n"
+            )
+        os.chmod(repro_min, 0o755)
+        if not minimise_log.exists():
+            minimise_log.write_text(
+                f"# Minimise log — {symptom}\n\n"
+                "Track each strip attempt as a row:\n\n"
+                "| # | Removed | Bug still reproduces? | Decision |\n"
+                "|---|---|---|---|\n"
+                "| 1 | <e.g. unused env var FOO> | yes | keep removed |\n"
+                "| 2 | <e.g. database call> | no | reverted |\n"
+            )
+        _bug_step(1.5, "MINIMISE", f"minimise template at {repro_min} + log at {minimise_log} — strip then re-run")
+
     # Step 2 — BUILD-MAP (Phase 4 read-only)
     p4 = None
     try:
