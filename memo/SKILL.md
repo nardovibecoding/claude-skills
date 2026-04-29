@@ -169,7 +169,21 @@ PY
 fi
 ```
 
-6. **Scribble mode** (`/memo <body>` — terminal channel) — write a new memo with `from: terminal`, parse `#tag` tokens out of body:
+6. **Diff mode** (`/memo --since 7d` or `/memo --since 30d`) — 3-bucket activity view (NEW vs RECURRING vs RESOLVED) over the window. Default window = 7d when no value given. Includes both `pending/` and `done/` memos (per OQ3 — diff is about activity, not status). Invalid days (`abc`, `0`, negative) → error + usage hint:
+
+```bash
+if [ "$MODE" = "since" ]; then
+  python3 ~/.claude/skills/memo/scripts/diff.py --since "$SINCE_DAYS"
+fi
+```
+
+   The script:
+   - parses `--since 7d` / `--since 30` / `--since 14d` (strips optional `d` suffix; rejects non-numeric or N≤0 with exit 2)
+   - groups in-window memos: RESOLVED (`resolved` in tags) > RECURRING (any tag matches a tag from before window, or body fingerprint matches one before window) > NEW (rest)
+   - body fingerprint: lowercase + URL-stripped + alphanumeric-only, first 80 chars
+   - prints 3 sections (NEW / RECURRING / RESOLVED) — empty buckets render `(none)` per spec, never silent
+
+7. **Scribble mode** (`/memo <body>` — terminal channel) — write a new memo with `from: terminal`, parse `#tag` tokens out of body:
 
 ```bash
 python3 ~/.claude/skills/memo/scripts/scribble.py "$SCRIBBLE_BODY"
