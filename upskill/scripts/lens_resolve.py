@@ -39,8 +39,8 @@ def load_yaml(path: Path) -> dict:
     return yaml.safe_load(text)
 
 
-def resolve_path(lens_arg: str) -> tuple[str, Path | None]:
-    """Return (kind, path). kind in {"yaml", "menu"}; path None if menu inline."""
+def resolve_path(lens_arg: str) -> tuple[str, Path]:
+    """Return (kind, path). kind in {"yaml", "menu"}."""
     if lens_arg.startswith("menu:"):
         return "menu", Path(lens_arg[len("menu:"):]).expanduser()
     p = Path(lens_arg).expanduser()
