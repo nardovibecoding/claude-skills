@@ -302,24 +302,33 @@ def main() -> int:
     raw_candidates: list[dict] = []
 
     if is_menu_mode:
-        # Menu mode: one gh search per item, batches purely structural for cap calc.
+        # Menu mode: one gh search per BATCH of ≤5 items.
+        # All items' keywords in the batch OR-joined into a single query.
+        # Per spec §3: "Cap at 5 items per call (so 30-item menu = 6 calls)".
         for batch in batches:
+            batch_keywords: list[str] = []
+            ids: list[str] = []
             for item in batch:
-                item_keywords = item.get("keywords") or []
-                if not item_keywords:
-                    continue
-                query = " OR ".join(item_keywords)
-                rc, rows, err = gh_search_repos(query, args.verbose)
-                out["calls_made"] += 1
-                src = f"menu_item:{item.get('id', item.get('name', '?'))}"
-                if rc != 0:
-                    out["errors"].append({"source": src, "error": f"{rc}+{err}"})
-                    out["scout_degraded"] = True
-                    continue
-                for r in rows:
-                    raw_candidates.append(
-                        to_candidate(r, item_keywords + keywords_for_match, src)
-                    )
+                ks = item.get("keywords") or []
+                batch_keywords.extend(ks)
+                ids.append(str(item.get("id", item.get("name", "?"))))
+            if not batch_keywords:
+                continue
+            # dedup preserving order
+            seen_kw: set[str] = set()
+            ordered = [k for k in batch_keywords if not (k in seen_kw or seen_kw.add(k))]
+            query = " OR ".join(ordered)
+            rc, rows, err = gh_search_repos(query, args.verbose)
+            out["calls_made"] += 1
+            src = f"menu_batch:{','.join(ids)[:60]}"
+            if rc != 0:
+                out["errors"].append({"source": src, "error": f"{rc}+{err}"})
+                out["scout_degraded"] = True
+                continue
+            for r in rows:
+                raw_candidates.append(
+                    to_candidate(r, ordered + keywords_for_match, src)
+                )
     else:
         for group in groups:
             if not group:
