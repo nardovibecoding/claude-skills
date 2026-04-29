@@ -60,14 +60,15 @@ def scan(host: str) -> dict:
                              "args": p["args"][:120]})
     findings.sort(key=lambda x: x["pcpu_t1"], reverse=True)
     crit = [f for f in findings if f["pcpu_t1"] >= CPU_CRIT]
-    if crit:
+    t = COUNT_THRESHOLDS.get(host, _DEFAULT_T)
+    if len(crit) >= t["crit_n"]:
         verdict = "crit"
-        summary = f"{len(crit)} procs >={CPU_CRIT}% CPU sustained, {len(findings)} >={CPU_WARN}%"
-    elif findings:
+        summary = f"{len(crit)} procs >={CPU_CRIT}% CPU sustained (>={t['crit_n']} on {host}), {len(findings)} >={CPU_WARN}%"
+    elif len(findings) >= t["warn_n"]:
         verdict = "warn"
-        summary = f"{len(findings)} procs >={CPU_WARN}% CPU sustained 3s"
+        summary = f"{len(findings)} procs >={CPU_WARN}% CPU sustained 3s (>={t['warn_n']} on {host})"
     else:
         verdict = "ok"
-        summary = "no sustained hot procs"
+        summary = f"{len(findings)} sustained warm procs (under {t['warn_n']} on {host})"
     return {"verdict": verdict, "evidence_cmd": "ps -eo pid,pcpu,comm,args (sampled 2x, 3s apart)",
             "findings": findings[:30], "summary": summary}
