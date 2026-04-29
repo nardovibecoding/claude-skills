@@ -1407,18 +1407,31 @@ def cmd_performance(argv: list[str]) -> int:
     _bug_step(9, "RUNTIME-VERIFY", verify_outcome)
 
     # Step 10 CLASSIFY
+    # Detector verdicts override "inconclusive" when they surface real signal.
+    det_worst = "ok"
+    if detector_results:
+        order = {"ok": 0, "warn": 1, "error": 2, "crit": 3}
+        for r in detector_results:
+            v = r.get("verdict", "ok")
+            if order.get(v, 0) > order.get(det_worst, 0):
+                det_worst = v
     if dry:
         verdict = "inconclusive"
         exit_code = 3
+    elif det_worst == "crit":
+        verdict = "regression"
+        exit_code = 1
+    elif det_worst == "warn":
+        verdict = "regression"
+        exit_code = 1
     elif not flags["baseline"]:
-        # No prior baseline file → cannot compute regression; capture as first-baseline
+        # No prior baseline + clean detectors → first-baseline run.
         verdict = "inconclusive"
         exit_code = 3
     else:
-        # Future: real delta computation. Conservative default until baseline diff implemented.
         verdict = "within-budget"
         exit_code = 0
-    _bug_step(10, "CLASSIFY", f"verdict={verdict}")
+    _bug_step(10, "CLASSIFY", f"verdict={verdict} detectors_worst={det_worst}")
 
     # Step 11 DEPTH-CHECK
     steps = [
