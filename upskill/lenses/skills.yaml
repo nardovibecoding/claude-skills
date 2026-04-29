@@ -1,0 +1,15 @@
+name: skills
+keywords:
+  - claude skill
+  - agent capability
+  - SKILL.md
+  - anthropic skill
+  - skill marketplace
+gh_topics: [claude-code, claude-skill, anthropic]
+scoring_weights:
+  stars: 0.3
+  recency: 0.2
+  keyword_fit: 0.4
+  language_match: 0.1
+integration_cost_model: skills
+overlay_sources: []
