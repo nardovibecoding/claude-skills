@@ -71,7 +71,7 @@ fi
 # Use when you skipped /daemons for a few days and want "what changed".
 if [ "$ARG" = "--since" ]; then
   DAYS="${2:-7}"
-  python3 ~/.claude/skills/bigd/scripts/since_diff.py "$DAYS"
+  python3 ~/.claude/skills/daemons/scripts/since_diff.py "$DAYS"
   exit 0
 fi
 
