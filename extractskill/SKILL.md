@@ -112,5 +112,9 @@ When given a repo URL with multiple skills:
 - Always use background agents for fetching/evaluation
 - Run skill-security-auditor before any install
 - Never install enterprise/compliance frameworks (SOC2, HIPAA, PCI-DSS) — not relevant
-- Extracted patterns go to memory, not CLAUDE.md (unless they are actionable rules)
+- Extracted patterns go to `~/NardoWorld/atoms/extracted-patterns/` (not CLAUDE.md unless actionable rule)
 - If a skill is just a static playbook (no scripts, no hooks), EXTRACT don't INSTALL
+
+## Canonical implementation
+
+Install logic lives in `~/.claude/skills/upskill/scripts/extract.py` (single source). /extractskill standalone wraps it via `--standalone-url <url>` for manual entry without /upskill context. /upskill v2 invokes the same code path automatically after Phase 6 adopt confirm. Dedup: no parallel install path.
