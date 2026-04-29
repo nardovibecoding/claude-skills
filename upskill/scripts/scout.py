@@ -286,14 +286,13 @@ def main() -> int:
         if is_menu_mode:
             half = max(1, math.ceil(len(batches) / 2))
             batches = batches[:half]
-            out["expected_calls"] = sum(len(b) for b in [batches])  # placeholder
             out["expected_calls"] = len(batches)
         else:
-            half_g = max(1, math.ceil(len(groups) / 2))
-            groups = groups[:half_g]
+            half_kw = max(1, math.ceil(len(kw_list) / 2))
+            kw_list = kw_list[:half_kw]
             half_t = max(0, math.ceil(len(gh_topics) / 2))
             gh_topics = gh_topics[:half_t]
-            out["expected_calls"] = len(groups) + len(gh_topics)
+            out["expected_calls"] = len(kw_list) + len(gh_topics)
 
     if args.dry_run:
         out["scout_skipped"] = out["scout_skipped"] or "dry_run"
