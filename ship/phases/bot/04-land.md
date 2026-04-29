@@ -15,6 +15,12 @@ Load `phases/common/realization-checks.md`. Run RC-1 to RC-7 in declared order. 
 
 If any RC fires, the offending file:line + the rule name MUST appear in the artifact's "Realization Check failures" section. Override path per-RC documented in `realization-checks.md`.
 
+## Production Orphan / Zombie Check (run AFTER unit restart, BEFORE phase close)
+
+Load `phases/common/production-orphan-check.md`. Run OC-1 (orphan/zombie inventory on deploy host) and OC-2 (load-divergence sanity). BLOCK verdict on `git index-pack` orphans, `<defunct>` zombies, or rogue PPID=1 long-lived runtime processes. Log evidence to `experiments/orphan-check.md`.
+
+Source incident: 2026-04-29 London CPU 96% from 32 orphan `git index-pack receive-pack` (PPID=1, etime>47min) accumulated across prior deploys. See `~/.claude/rules/infra.md` § Push-receiving host defense.
+
 ---
 
 ## Steps
