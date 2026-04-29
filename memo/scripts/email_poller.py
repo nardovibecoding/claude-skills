@@ -333,7 +333,7 @@ def _poll(*, dry_run: bool) -> int:
 
     resp = service.users().messages().list(userId="me", q=GMAIL_QUERY, maxResults=50).execute()
     msgs = resp.get("messages", []) or []
-    log.info("poll: %d unread matching %r", len(msgs), GMAIL_QUERY)
+    log.info("poll: %d inbox candidates after Gmail-side suppress", len(msgs))
 
     counts = {"write": 0, "dry-write": 0, "discard": 0, "write-but-not-marked": 0, "error": 0}
     for stub in msgs:
