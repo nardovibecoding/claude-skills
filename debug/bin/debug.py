@@ -699,13 +699,25 @@ flags:   quick={quick} no_chain={no_chain}
         os.chmod(repro, 0o755)
         _bug_step(1, "REPRODUCE", f"repro template at {repro} — populate then re-run")
 
-    # Step 1.5 — MINIMISE (pocock/skills diagnose)
+    # Step 1.5 — MINIMISE (Zeller ddmin engine; opt-in via --auto-minimise)
     repro_min = exp_dir / "repro-min.sh"
     minimise_log = state_dir / "minimise-log.md"
     if dry:
         repro_min.write_text("#!/usr/bin/env bash\n# dry-run: minimise skipped\nexit 0\n")
         minimise_log.write_text(f"# minimise log — {symptom}\n\ndry-run\n")
         _bug_step(1.5, "MINIMISE", "--dry-run: skipped minimise")
+    elif flags.get("auto_minimise"):
+        ok, summary = _run_auto_minimise(
+            repro_path=repro,
+            repro_min_path=repro_min,
+            log_path=minimise_log,
+            flags=flags,
+            header_label=f"Minimise log — {symptom}",
+        )
+        if ok:
+            _bug_step(1.5, "MINIMISE", f"auto-minimise OK — {summary} — out: {repro_min}, log: {minimise_log}")
+        else:
+            _bug_step(1.5, "MINIMISE", f"auto-minimise FAILED — see {minimise_log}")
     else:
         if not repro_min.exists():
             repro_min.write_text(
@@ -714,19 +726,20 @@ flags:   quick={quick} no_chain={no_chain}
                 f"# Strategy: remove env vars / data rows / deps / setup steps one at a time;\n"
                 "# re-run after each strip; KEEP the strip if the bug still reproduces, REVERT if it doesn't.\n"
                 "# Halt when no further strip leaves the failure intact.\n"
+                "# Or: pass --auto-minimise --fingerprint=exit:1 to run ddmin automatically.\n"
                 "exit 1\n"
             )
         os.chmod(repro_min, 0o755)
         if not minimise_log.exists():
             minimise_log.write_text(
                 f"# Minimise log — {symptom}\n\n"
-                "Track each strip attempt as a row:\n\n"
+                "Track each strip attempt as a row, OR re-run with --auto-minimise to fill in automatically:\n\n"
                 "| # | Removed | Bug still reproduces? | Decision |\n"
                 "|---|---|---|---|\n"
                 "| 1 | <e.g. unused env var FOO> | yes | keep removed |\n"
                 "| 2 | <e.g. database call> | no | reverted |\n"
             )
-        _bug_step(1.5, "MINIMISE", f"minimise template at {repro_min} + log at {minimise_log} — strip then re-run")
+        _bug_step(1.5, "MINIMISE", f"minimise template at {repro_min} + log at {minimise_log} — strip then re-run, or use --auto-minimise")
 
     # Step 2 — BUILD-MAP (Phase 4 read-only)
     p4 = None
