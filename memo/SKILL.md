@@ -120,6 +120,19 @@ for r in rows:
 PY
 ```
 
+5. **Scribble mode** (`/memo <body>` — terminal channel) — write a new memo with `from: terminal`, parse `#tag` tokens out of body:
+
+```bash
+python3 ~/.claude/skills/memo/scripts/scribble.py "$SCRIBBLE_BODY"
+```
+
+   The script:
+   - parses `#tag` tokens via regex `(?:^|\s)#[a-z][a-z0-9-]{2,30}(?=\s|$)` — URL fragments like `#section` after non-whitespace are NOT picked up
+   - strips tag tokens from body
+   - writes `~/telegram-claude-bot/memo/pending/<ts>_terminal.md` with frontmatter `from: terminal, type: general, created: <ts>, status: pending, tags: [...]`
+   - calls `update_index()` so the JSONL index is current
+   - prints confirmation `memo saved: <body[:60]>...  [tags: #tag1 #tag2]`
+
 ## Notes
 
 - Memos arrive automatically via `memo_display.py` hook on every UserPromptSubmit — bare `/memo` is for manual recheck, `/memo #tag` is for filtered recall.
