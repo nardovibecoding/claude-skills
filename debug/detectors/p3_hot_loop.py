@@ -8,6 +8,17 @@ from ._shell import run_on
 CPU_WARN = 5.0
 CPU_CRIT = 50.0
 
+# Per-host: how many sustained-hot procs flip the verdict.
+# Mac is a workstation (Chrome / Xcode / video) — many procs at >5% sustained
+# is normal. VPS hosts run lean and a single hot proc at 50%+ matters.
+COUNT_THRESHOLDS = {
+    "mac":    {"warn_n": 5, "crit_n": 3},   # warn if >=5 warm procs, crit if >=3 hot procs
+    "local":  {"warn_n": 5, "crit_n": 3},
+    "hel":    {"warn_n": 1, "crit_n": 1},
+    "london": {"warn_n": 1, "crit_n": 1},
+}
+_DEFAULT_T = {"warn_n": 3, "crit_n": 2}
+
 
 def _sample(host: str) -> dict[str, dict]:
     cmd = "ps -eo pid,pcpu,comm,args | tail -n +2"
