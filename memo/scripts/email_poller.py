@@ -291,8 +291,9 @@ def _process_message(parsed: dict, *, dry_run: bool, service=None) -> str:
         log.warning("discard: sender %r not in allowlist (msg=%s)", from_addr, msg_id)
         return "discard"
 
-    # Combine subject + body for tag extraction. Strip "MEMO:" prefix from subject.
-    subject_for_tags = re.sub(r"^\s*MEMO\s*:\s*", "", subject, count=1, flags=re.IGNORECASE)
+    # Combine subject + body for tag extraction. Subject:MEMO prefix gating
+    # removed in Slice 1 rebuild — subject is no longer required to start with "MEMO".
+    subject_for_tags = subject
     combined = subject_for_tags.strip() + "\n\n" + body_raw.strip()
 
     cleaned, tags = _extract_tags(combined)
