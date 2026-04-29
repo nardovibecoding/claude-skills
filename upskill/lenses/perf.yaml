@@ -1,0 +1,17 @@
+name: perf
+keywords:
+  - performance
+  - cache
+  - speed up
+  - optimization
+  - memory leak
+  - hot path
+gh_topics: [performance, optimization]
+scoring_weights:
+  stars: 0.3
+  recency: 0.3
+  keyword_fit: 0.3
+  language_match: 0.1
+integration_cost_model: code
+overlay_sources: [bigd-perf]
+lang: typescript|python
