@@ -11,15 +11,27 @@ Single source of truth for visual style across **SwiftUI macOS** (VibeIsland), *
 
 ## How autorouting works
 
-On invocation, scan the user prompt + surrounding context. Resolve four axes in order; the first match wins per axis. Never ask if any axis is filled.
+On invocation, scan the user prompt + surrounding context. Resolve six axes in order; the first match wins per axis. Never ask if any axis is filled.
 
-### 1. Brand (highest priority — locks all 4 token families)
+### 0. Project alias (highest priority — pins surface)
+
+If the prompt names a known project (vibe-island, pm-bot, dagou, chrome-ext, NardoWorld, big-d, etc.) match against `project-aliases.md` — pins the renderer regardless of cwd. Project alias also supplies a default vibe + archetype if user gave no other axis.
+
+### 1. Vibe (plain-English style — 80 layman names)
+
+If the prompt names a vibe from `vibes/encyclopedia.md` (case-insensitive alias substring): load that entry directly. Vibes override directions+registers (those become legacy designer-jargon fallback). Triggers cover historical movements (art-deco, bauhaus, memphis, rococo), eras (mid-century, 80s synthwave, y2k, frutiger-aero), internet aesthetics (vaporwave, cottagecore, dark-academia, liminal-spaces), film/animation (studio-ghibli, wes-anderson, akira-cyberpunk, film-noir), fashion (techwear, streetwear, old-money, normcore), regional (hong-kong-neon, wabi-sabi, scandinavian-hygge, korean-y2k), subcultures (cyberpunk, steampunk, solarpunk), materials (risograph, pixel-art, glitch, holographic), brand-archetypes (apple-clean, bloomberg-terminal, nintendo-playful, tiffany), and moods (cozy, moody, sharp, misty). See `vibes/encyclopedia.md` for the full 80.
+
+Multi-vibe combine with `+`: `/design art-deco + bloomberg-terminal` merges palettes (deco gold + terminal black bg + amber data) and typography (Avant Garde display + IBM Plex Mono body). See `vibes/improv.md` rules.
+
+### 2. Brand (locks all 4 token families)
 
 If the prompt names a brand from `brands/` (case-insensitive substring match): load `brands/<name>.md` directly. Examples: "make it linear-style", "stripe vibes", "like notion", "feels like tesla", "claude colors".
 
 Available brands (81 total): see `brands/`. Common: apple, linear-app, stripe, notion, figma, vercel, tesla, ferrari, lamborghini, claude, cursor, raycast, supabase, vercel, airbnb, uber, spotify, pinterest, framer, sanity, mistral-ai, cohere, x-ai, posthog, mongodb, hashicorp, nvidia, ibm, intercom, mintlify, resend, sentry, replicate, runwayml, lovable, miro, figma, expo, kraken, coinbase, revolut, wise, toss, kakao, line, mercari, pinkoi, dcard, etc.
 
-### 2. Direction (5 OKLch palette families)
+Note: Bernard rarely names brands; vibes are usually the better match. Brand match is reserved for explicit "make it stripe-style" requests.
+
+### 3. Direction (5 OKLch palette families — designer-jargon fallback)
 
 If no brand but prompt names a direction: load `directions/<name>.md`. Trigger words:
 - **editorial** / "magazine" / "long-form" / "journalism" → `directions/editorial-monocle.md`
