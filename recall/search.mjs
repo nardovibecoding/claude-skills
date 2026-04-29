@@ -663,8 +663,8 @@ async function main() {
   // Recency
   const recencyRank = recencyRanked(files);
 
-  // Weighted RRF (per-signal weights loaded from .recall_weights.json)
-  const weights = loadWeights();
+  // Weighted RRF: --weights '<json>' CLI flag overrides loadWeights() (cube-classifier path)
+  const weights = weightsOverride ? { ...loadWeights(), ...weightsOverride } : loadWeights();
   const fused = reciprocalRankFusionWeighted([
     { list: vectorRanked, name: "vector" },
     { list: bm25Ranked, name: "bm25" },
