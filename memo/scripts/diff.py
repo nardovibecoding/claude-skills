@@ -42,17 +42,6 @@ def _fingerprint(body: str) -> str:
 # --------------------------------------------------------------------------
 # ts parser — index ts is `YYYY-MM-DD HH:MM` (16 chars) per S1 output
 # --------------------------------------------------------------------------
-def _parse_ts(ts: str) -> datetime | None:
-    if not ts:
-        return None
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
-        try:
-            return datetime.strptime(ts[: len(fmt) + (2 if "%S" in fmt else 0)] if False else ts[:19] if fmt.endswith("%S") else ts[:16], fmt)
-        except ValueError:
-            continue
-    return None
-
-
 def _parse_ts_safe(ts: str) -> datetime | None:
     """Try 19-char then 16-char ISO-ish parse."""
     if not ts:
