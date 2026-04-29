@@ -124,7 +124,47 @@ for r in rows:
 PY
 ```
 
-5. **Scribble mode** (`/memo <body>` — terminal channel) — write a new memo with `from: terminal`, parse `#tag` tokens out of body:
+5. **Search mode** (`/memo search <kw>`) — case-insensitive substring match over `body_preview` + `from`. Bare `/memo search` with no kw emits a usage hint and exits. Multi-word kw: everything after the literal `search ` is one query. The kw is passed as argv (no shell interpolation), so `$`, `"`, backticks, etc. are safe:
+
+```bash
+if [ -z "$SEARCH_KW" ]; then
+  echo 'Usage: /memo search <keyword>'
+else
+python3 - "$SEARCH_KW" <<'PY'
+import sys, os, datetime
+sys.path.insert(0, os.path.expanduser("~/.claude/skills/memo/scripts"))
+from index import query_index, build_index, INDEX_FILE
+
+kw = sys.argv[1]
+if not INDEX_FILE.exists():
+    build_index()  # lazy init from S1
+
+rows = query_index(search=kw, limit=5)
+if not rows:
+    print(f'(no memos matching "{kw}")')
+    sys.exit(0)
+
+def hkt(ts: str) -> str:
+    try:
+        dt = datetime.datetime.strptime(ts[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return ts[:16]
+    dt += datetime.timedelta(hours=8)
+    return dt.strftime("%m-%d %H:%M:%S")
+
+print("| When (HKT)        | Status  | Tags                 | Content |")
+print("|-------------------|---------|----------------------|---------|")
+for r in rows:
+    when = hkt(r.get("ts", ""))
+    status = "PENDING" if r.get("status") == "pending" else "done"
+    tags = ",".join(f"#{t}" for t in r.get("tags") or [])
+    body = (r.get("body_preview") or "").replace("|", "\\|")[:60]
+    print(f"| {when:<17} | {status:<7} | {tags:<20} | {body} |")
+PY
+fi
+```
+
+6. **Scribble mode** (`/memo <body>` — terminal channel) — write a new memo with `from: terminal`, parse `#tag` tokens out of body:
 
 ```bash
 python3 ~/.claude/skills/memo/scripts/scribble.py "$SCRIBBLE_BODY"
