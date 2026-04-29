@@ -76,7 +76,7 @@ Covered categories: eval/exec/shell=True, network calls, credential harvesting, 
 **If EXTRACT:**
 1. Read the skill thoroughly
 2. Extract ONLY the unique patterns/techniques we're missing
-3. Append to ~/.claude/projects/-Users-bernard/memory/research_extracted_patterns.md
+3. Append to `~/NardoWorld/atoms/extracted-patterns/<slug>-<date>.md` (per /upskill v2 spec A13)
 4. Update MEMORY.md if adding a new reference file
 5. If patterns are actionable rules, route per CLAUDE.md "Rule promotion routing" HARD RULE: project/domain-specific → `~/.claude/rules/<scope>.md`; truly universal → CLAUDE.md. Default to scoped file — CLAUDE.md stays lean.
 
