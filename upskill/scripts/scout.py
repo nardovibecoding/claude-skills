@@ -322,7 +322,7 @@ def main() -> int:
             # dedup preserving order
             seen_kw: set[str] = set()
             ordered = [k for k in batch_keywords if not (k in seen_kw or seen_kw.add(k))]
-            query = " OR ".join(ordered)
+            query = " OR ".join(quote_kw(k) for k in ordered)
             rc, rows, err = gh_search_repos(query, args.verbose)
             out["calls_made"] += 1
             src = f"menu_batch:{','.join(ids)[:60]}"
