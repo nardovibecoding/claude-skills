@@ -40,7 +40,7 @@ If no brand but prompt names a direction: load `directions/<name>.md`. Trigger w
 - **brutalist** / "raw" / "harsh" / "industrial" / "grid" → `directions/brutalist.md`
 - **soft** / "warm" / "cozy" / "earth tone" / "human" → `directions/soft-warm.md`
 
-### 3. Register (9 cultural locks — orthogonal to direction)
+### 4. Register (9 cultural locks — designer-jargon fallback)
 
 If prompt names a register, load `registers/<name>.md`. Registers commit to a *culture*, not a palette. A "soft warm × startup-techy" project is allowed; a "soft warm × luxury-editorial" project is also allowed. Locks vibe, not values.
 
