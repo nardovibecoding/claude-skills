@@ -52,9 +52,14 @@ Inspect `$ARG` (the verb argument after `/memo`):
        MODE=search
        SEARCH_KW="${ARG#search }"      # everything after the literal "search " prefix
        ;;
+     "--since")
+       MODE=since
+       SINCE_DAYS="7d"             # default window
+       ;;
      "--since "*)
-       echo "(--since diff mode — coming in slice S7)"
-       exit 0
+       MODE=since
+       SINCE_DAYS="${ARG#--since }"   # everything after literal "--since "
+       SINCE_DAYS="${SINCE_DAYS%% *}" # first whitespace-delimited token only
        ;;
      *)
        MODE=scribble
