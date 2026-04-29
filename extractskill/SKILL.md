@@ -56,7 +56,7 @@ Score against Bernard's existing system:
 
 ```bash
 # Point auditor at the fetched skill
-~/.claude/skills/skill-security-auditor/scripts/scan.py <fetched-skill-dir>
+~/.claude/skills/skill-security-auditor/scripts/skill_security_auditor.py <fetched-skill-dir>
 ```
 
 Gate logic:
