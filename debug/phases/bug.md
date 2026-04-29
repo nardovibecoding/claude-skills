@@ -58,6 +58,7 @@ ALL of these mean: STOP. Return to Step 1.
 |---|---|---|---|---|
 | 0 | TRIAGE | new + 5whys | `state/triage.md` | What/When/Where/Impact (5-Whys problem template); auto bug-slug |
 | 1 | REPRODUCE | doraemonkeys + obra Phase 1.2 | `experiments/repro.sh` + exit code | deterministic fail cmd; if non-determ → halt + gather more data |
+| 1.5 | MINIMISE | pocock/skills `diagnose` (MIT) | `experiments/repro-min.sh` + `state/minimise-log.md` | shrink `repro.sh` to smallest deterministic failing case; strip env/data/deps one at a time, re-run after each strip; keep when bug survives, revert when it doesn't; halt when nothing else can be removed without losing the failure |
 | 2 | BUILD-MAP | Phase 4 L1+L3 (read-only) | inline cite | substring match on pipeline_graph + data_lineage |
 | 3 | EXECUTION-MAP | Phase 4 L1+L2 (read-only) | inline cite | substring match on state_registry + sync_graph |
 | 4 | DEPENDENCY-MAP | Phase 4 L4 + orphan-sweep (⚡light) | inline cite | consistency_registry signals + pre-S5 fallback for orphan_registry |
