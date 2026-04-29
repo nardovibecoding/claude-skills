@@ -114,14 +114,16 @@ Steps 6/7/8 are **unconditional**. Never skipped. Never optional.
 
 ## Override syntax
 
+- `/design <vibe>` — primary form. e.g. `/design art-deco`, `/design studio-ghibli`, `/design cyberpunk`, `/design wes-anderson`. Full list: `vibes/encyclopedia.md` (80 entries).
+- `/design <vibe-a> + <vibe-b>` — hybridize. e.g. `/design art-deco + cyberpunk`, `/design wabi-sabi + bloomberg-terminal`.
+- `/design <project>` — emit using project's defaults. e.g. `/design vibe-island`, `/design pm-bot`.
+- `/design <project> <vibe>` — combine. e.g. `/design vibe-island art-deco`, `/design pm-bot cyberpunk`.
+- `/design <archetype>` — emit archetype scaffold. e.g. `/design dashboard`, `/design popup`.
 - `/design <brand>` — lock to brand. e.g. `/design linear-app`, `/design stripe`.
-- `/design <direction>` — lock direction. e.g. `/design brutalist`.
-- `/design <register>` — lock register. e.g. `/design startup-techy`.
-- `/design <archetype>` — emit archetype scaffold. e.g. `/design dashboard`.
-- `/design <a> + <b>` — combine. e.g. `/design tech-utility + craft-artisan`.
 - `/design refresh` — re-emit `tokens.json` + renderer artifact from existing `DESIGN.md`.
 - `/design audit` — run lint + anti-slop + self-critique on existing files only, no emit.
 - `/design extract <url>` — extract DTCG tokens from a public site (Playwright-based; uses `tokens/extract.md` recipe).
+- `/design <unknown vibe>` — fallback to `vibes/improv.md` — extract concept words, hybridize from closest 1-3 known vibes, document derivation in DESIGN.md.
 
 ---
 
