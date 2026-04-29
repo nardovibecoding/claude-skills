@@ -253,7 +253,7 @@ def main() -> int:
         batches, expected = plan_menu(lens)
         out["expected_calls"] = expected
     else:
-        groups, gh_topics, expected = plan_standard(lens)
+        kw_list, gh_topics, expected = plan_standard(lens)
         out["expected_calls"] = expected
 
     # Pre-flight rate-limit (BEFORE any gh search)
