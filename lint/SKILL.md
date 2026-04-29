@@ -47,7 +47,7 @@ Always run **Capacity monitoring** at end (table below — small enough to keep 
 | Pending JSONL (>7d) | 0 | 1-3 | > 3 |
 | Skills count | < 80 | 80-120 | > 120 |
 | Skills disk | < 100MB | 100-500MB | > 500MB |
-| Project docs stale-prose hits | 0 | 1-3 | > 3 |
+| Project doc sync findings | 0 | 1-3 | > 3 |
 
 ## Execution rule
 
