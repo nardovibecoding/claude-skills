@@ -31,14 +31,18 @@ def scan(host: str) -> dict:
         findings.append({"pid": parts[0], "ppid": parts[1], "stat": parts[2],
                          "comm": parts[3], "etime": parts[4] if len(parts) > 4 else ""})
     n = len(findings)
+    t = THRESHOLDS.get(host, _DEFAULT_T)
     if n == 0:
         verdict = "ok"
         summary = "no zombies"
-    elif n < 5:
-        verdict = "warn"
-        summary = f"{n} zombie procs"
-    else:
+    elif n >= t["crit"]:
         verdict = "crit"
-        summary = f"{n} zombie procs (>=5)"
+        summary = f"{n} zombie procs (>={t['crit']} on {host})"
+    elif n >= t["warn"]:
+        verdict = "warn"
+        summary = f"{n} zombie procs (>={t['warn']} on {host})"
+    else:
+        verdict = "ok"
+        summary = f"{n} zombie procs (under {t['warn']} on {host})"
     return {"verdict": verdict, "evidence_cmd": cmd,
             "findings": findings, "summary": summary}
