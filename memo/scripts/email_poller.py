@@ -47,13 +47,15 @@ CLIENT_SECRETS_PATH = _HERE / ".gmail_client_secrets.json"
 # Gmail API scope: read messages + modify labels (mark read)
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 
-# Sender allowlist per Q-B (LOCKED 01-spec.md §11)
-# DEPRECATED: removed in Slice 3 when classifier replaces sender allowlist
-ALLOWED_SENDERS = frozenset(["bernard.ngb@gmail.com"])
+# Hard-surface allowlist file (Slice 3). Bernard-edited file with email + @domain
+# entries; loaded on first classify, re-loaded on mtime change. Replaces
+# Slice 1/2 ALLOWED_SENDERS frozenset (now removed).
+ALLOWLIST_PATH = _HERE / "email_allowlist.txt"
+_ALLOWLIST_CACHE: dict = {"mtime": 0.0, "emails": frozenset(), "domains": frozenset()}
 
 # Gmail query — inbox-triage (Slice 1 rebuild). Gmail-side category suppress
-# + label-based idempotency (label-add lands Slice 2). Pass-through classifier
-# this slice; L1-L4 layering arrives Slice 3.
+# + label-based idempotency (label-add Slice 2). 4-layer classifier (L1 hard-
+# suppress / L2 hard-surface / L3 auto-noise / L4 default-suppress) lands Slice 3.
 GMAIL_QUERY = (
     "is:unread newer_than:1d "
     "-category:promotions -category:social -category:updates -category:forums "
