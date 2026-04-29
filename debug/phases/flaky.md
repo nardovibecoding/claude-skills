@@ -39,6 +39,23 @@ In `--dry-run` mode, synthesize 10 fixture rows mixing pass/fail to exercise the
 
 ---
 
+## Step 1.5 MINIMISE (flaky variant — added 2026-04-29)
+
+After REPRODUCE captures the loop fail-rate, MINIMISE shrinks the env/config until the smallest setup that still produces fail-rate ≥ **30%** over N runs. Pocock/skills `diagnose` (MIT) — flaky shape.
+
+- Strip env vars / data rows / concurrency level / setup steps **one at a time**.
+- Re-run the loop after each strip.
+- KEEP the strip if fail-rate stays ≥30%; REVERT if it drops.
+- Halt when no further strip leaves fail-rate above the threshold.
+
+Output:
+- `experiments/repro-min-flaky.sh` — smallest deterministic flaky-reproducing script
+- `state/minimise-log.md` — per-strip table: `# | Removed | New fail-rate | Decision`
+
+Why 30%: below that, run-count to confirm flakiness explodes (you'd need >50 runs to distinguish 5% flaky from 0%). 30% gives signal-to-noise within 10 runs.
+
+---
+
 ## Hypothesis priors (Step 6 GEN auto-seeded)
 
 Race-pattern set:
