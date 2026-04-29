@@ -31,7 +31,7 @@ fire only the MISSING host(s) ───→ wait → pull → assemble → render
             no host has anything → full fire (~3 min)
 ```
 
-`/bigd --force` always fires all 3. `/bigd --status` only reports state, no work.
+`/daemons --force` always fires all 3. `/daemons --status` only reports state, no work.
 
 ## Steps (single bash run)
 
