@@ -248,7 +248,10 @@ def main() -> int:
         "mode": "menu" if is_menu_mode else "standard",
     }
 
-    # Plan
+    # Plan — initialize both branches so pyright sees them bound on every path.
+    batches: list[list[dict]] = []
+    kw_list: list[str] = []
+    gh_topics: list[str] = []
     if is_menu_mode:
         batches, expected = plan_menu(lens)
         out["expected_calls"] = expected
