@@ -159,7 +159,6 @@ class TestFlakyProbe(unittest.TestCase):
         self.assertTrue(oracle([]))  # 7/10 >= 0.5
 
     def test_below_threshold(self):
-        from _lib.minimise import ProbeResult
         counter = {"i": 0}
 
         def raw(_subset):
