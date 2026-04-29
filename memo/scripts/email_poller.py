@@ -502,9 +502,25 @@ def _process_message(
     body_raw = parsed["body_raw"]
     msg_id = parsed["msg_id"]
 
-    if from_addr not in ALLOWED_SENDERS:
-        log.warning("discard: sender %r not in allowlist (msg=%s)", from_addr, msg_id)
-        return "discard"
+    # Slice 3: 4-layer classifier replaces sender allowlist gate.
+    # L1 hard-suppress / L2 hard-surface / L3 auto-noise / L4 default-suppress.
+    verdict, reason = _classify(parsed)
+    log.info(
+        "classify: %s (%s) — from=%s subj=%s",
+        verdict, reason, from_addr, subject[:60],
+    )
+    if verdict == "suppress":
+        # Apply label so we don't re-fetch this email next poll. Skip memo write.
+        if not dry_run and service is not None and label_id:
+            try:
+                service.users().messages().modify(
+                    userId="me",
+                    id=msg_id,
+                    body={"addLabelIds": [label_id]},
+                ).execute()
+            except Exception as e:
+                log.error("label-apply failed for suppressed %s: %s", msg_id, e)
+        return f"suppress:{reason.split(':', 1)[0]}"  # e.g. "suppress:L1"
 
     # Combine subject + body for tag extraction. Subject:MEMO prefix gating
     # removed in Slice 1 rebuild — subject is no longer required to start with "MEMO".
