@@ -583,7 +583,12 @@ def _poll(*, dry_run: bool) -> int:
     msgs = resp.get("messages", []) or []
     log.info("poll: %d inbox candidates after Gmail-side suppress", len(msgs))
 
-    counts = {"write": 0, "dry-write": 0, "discard": 0, "write-but-not-labeled": 0, "error": 0}
+    # Slice 3: classifier emits suppress:L1 / L2 / L3 / L4 verdicts; per-layer
+    # buckets seeded so log shows zero-fire layers explicitly.
+    counts = {
+        "write": 0, "dry-write": 0, "write-but-not-labeled": 0, "error": 0,
+        "suppress:L1": 0, "suppress:L3": 0, "suppress:L4": 0,
+    }
     for stub in msgs:
         try:
             full = service.users().messages().get(
