@@ -22,7 +22,7 @@ Single entry, no flags, no verbs. One sweep runs SOP steps 1-6 in order:
 
 ## v1 status
 
-**v1 = SKELETON ONLY.** SOP steps 1-6 are stubs that echo `[stub] step N: <name>` and exit 0. Subsequent slices (S2-S7) wire actual scout / gaps / perf / rank / spec-emit / handoff logic. See `~/.ship/upskill/goals/02-plan.md` §S1-S7.
+**v1 = GA (shipped 2026-04-29).** SOP steps 1-6 wired end-to-end via S2-S7 slices: scout (gh-CLI 8 calls), gaps_read (bigd-gaps cache+cold-fire), bottleneck_read (perf+dis-score), rank (rule-based ROI, no LLM), emit_spec (writes `.ship/upskill-<slug>/01-spec.md` + ledger row), handoff (prints `/extractskill` for ADOPT-EXT, `/ship continue` for FIX-*). Verify run 2026-04-29: 58 candidates, top-5 ranked, spec emitted, exit 0. See `~/.ship/upskill/goals/02-plan.md` §S1-S7 for slice-by-slice spec.
 
 ## Self-skeleton-detect (added 2026-04-27 — meta-protection)
 
