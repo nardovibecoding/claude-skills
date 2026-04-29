@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-memo-v2 Email channel poller (Slice S5).
+memo-v2 Email channel poller (Slice S5; rebuild Slice 1 — inbox-triage).
 
-Polls Gmail for unread emails matching:
-  is:unread from:bernard.ngb@gmail.com subject:MEMO
+Polls Gmail using inbox-triage query (Gmail-side category suppress + label exclusion):
+  is:unread newer_than:1d -category:promotions -category:social
+  -category:updates -category:forums -label:memo-processed
 
+Slice 1 = pass-through classifier (every fetched email becomes a memo).
+Layered classifier L1-L4 + label-add idempotency land in subsequent slices.
 For each match: parse #tags, strip HTML, truncate to 2KB, call
 _writer.write_memo(channel='email', source=<from-addr>), mark as READ.
-Idempotency relies on Gmail's read/unread state.
 
 Auth: Direct Gmail API via google-api-python-client + OAuth2 refresh token
 stored at ~/.claude/skills/memo/scripts/.gmail_token.json (gitignored).
