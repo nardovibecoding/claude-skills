@@ -314,22 +314,24 @@ def main() -> int:
     raw_candidates: list[dict] = []
 
     if is_menu_mode:
-        # Menu mode: one gh search per BATCH of ≤5 items.
-        # All items' keywords in the batch OR-joined into a single query.
+        # Menu mode: one gh search per BATCH of ≤5 items, joined with each item's
+        # primary keyword as a single search string. gh search doesn't honor OR
+        # boolean — the joined string acts as multi-term loose match.
         # Per spec §3: "Cap at 5 items per call (so 30-item menu = 6 calls)".
         for batch in batches:
-            batch_keywords: list[str] = []
             ids: list[str] = []
+            primary_terms: list[str] = []
+            all_kw: list[str] = []
             for item in batch:
                 ks = item.get("keywords") or []
-                batch_keywords.extend(ks)
+                if not ks:
+                    continue
+                primary_terms.append(ks[0])
+                all_kw.extend(ks)
                 ids.append(str(item.get("id", item.get("name", "?"))))
-            if not batch_keywords:
+            if not primary_terms:
                 continue
-            # dedup preserving order
-            seen_kw: set[str] = set()
-            ordered = [k for k in batch_keywords if not (k in seen_kw or seen_kw.add(k))]
-            query = " OR ".join(quote_kw(k) for k in ordered)
+            query = " ".join(primary_terms)
             rc, rows, err = gh_search_repos(query, args.verbose)
             out["calls_made"] += 1
             src = f"menu_batch:{','.join(ids)[:60]}"
@@ -339,7 +341,7 @@ def main() -> int:
                 continue
             for r in rows:
                 raw_candidates.append(
-                    to_candidate(r, ordered + keywords_for_match, src)
+                    to_candidate(r, all_kw + keywords_for_match, src)
                 )
     else:
         for kw in kw_list:
