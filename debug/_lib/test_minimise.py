@@ -69,7 +69,6 @@ class TestFingerprint(unittest.TestCase):
         self.assertFalse(fp.match(ProbeResult(exit=0, stdout="", stderr="", wall_ms=0)))
 
     def test_stderr_regex(self):
-        from _lib.minimise import ProbeResult
         fp = Fingerprint(exit_nonzero=True, stderr_regex=r"OOM|out of memory")
         self.assertTrue(fp.match(ProbeResult(exit=137, stdout="", stderr="OOM killed", wall_ms=0)))
         self.assertFalse(fp.match(ProbeResult(exit=137, stdout="", stderr="something else", wall_ms=0)))
