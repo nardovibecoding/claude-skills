@@ -1,0 +1,401 @@
+#!/usr/bin/env python3
+"""
+memo-v2 Email channel poller (Slice S5).
+
+Polls Gmail for unread emails matching:
+  is:unread from:bernard.ngb@gmail.com subject:MEMO
+
+For each match: parse #tags, strip HTML, truncate to 2KB, call
+_writer.write_memo(channel='email', source=<from-addr>), mark as READ.
+Idempotency relies on Gmail's read/unread state.
+
+Auth: Direct Gmail API via google-api-python-client + OAuth2 refresh token
+stored at ~/.claude/skills/memo/scripts/.gmail_token.json (gitignored).
+First-run setup: python3 email_poller.py --auth (browser flow).
+After that, --poll runs unattended in cron context.
+
+Entry points:
+  --auth     : launch browser OAuth flow, save refresh token
+  --poll     : fetch unread, write memos, mark read
+  --dry-run  : like --poll but does NOT mark read or write files
+
+See ~/.ship/memo-v2/goals/01-spec.md §4.2 + 02-plan.md §2.5.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+import re
+import sys
+from email.utils import parseaddr
+from pathlib import Path
+
+# Path setup so we can import _writer + scribble's tag extractor
+_HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(_HERE))
+
+# Gmail token + OAuth client config locations
+TOKEN_PATH = _HERE / ".gmail_token.json"
+CLIENT_SECRETS_PATH = _HERE / ".gmail_client_secrets.json"
+
+# Gmail API scope: read messages + modify labels (mark read)
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+
+# Sender allowlist per Q-B (LOCKED 01-spec.md §11)
+ALLOWED_SENDERS = frozenset(["bernard.ngb@gmail.com"])
+
+# Gmail query — fetched every poll
+GMAIL_QUERY = "is:unread from:bernard.ngb@gmail.com subject:MEMO"
+
+# Body truncation cap (2KB per spec §4.2)
+BODY_MAX_BYTES = 2048
+TRUNCATED_MARKER = "\n\n[truncated]"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s email_poller %(levelname)s %(message)s",
+)
+log = logging.getLogger(__name__)
+
+
+# ───────────────────────── Tag parsing (mirrors scribble.py) ─────────────────────────
+
+# Same regex as scribble._TAG_RE — keep in sync.
+_TAG_RE = re.compile(r"(?:^|\s)#([a-z][a-z0-9-]{2,30})(?=\s|$)")
+
+
+def _extract_tags(text: str) -> tuple[str, list[str]]:
+    """Return (text_with_tags_removed, [tags...]).
+
+    Mirrors scribble._extract_tags. Duplicated rather than imported to keep
+    poller importable when scribble.py is refactored. Both files reference
+    01-spec.md §4.2 / R3 for the canonical regex.
+    """
+    tags: list[str] = []
+    seen: set[str] = set()
+    for m in _TAG_RE.finditer(text):
+        t = m.group(1)
+        if t not in seen:
+            seen.add(t)
+            tags.append(t)
+
+    def _sub(match: re.Match) -> str:
+        leading = match.group(0)[: match.start(1) - match.start() - 1]
+        return " " if leading else ""
+
+    cleaned = _TAG_RE.sub(_sub, text)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned).strip()
+    return cleaned, tags
+
+
+# ───────────────────────── HTML → plain text ─────────────────────────
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_HTML_BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+_HTML_P_RE = re.compile(r"</p>", re.IGNORECASE)
+
+
+def _html_to_text(html: str) -> str:
+    """Lightweight HTML → plain text. No external dep.
+
+    Replaces <br>/<br/> + </p> with newlines, strips other tags, decodes
+    common entities. Sufficient for Gmail's mostly-clean HTML; not a full
+    HTML5 parser. Falls back to html2text if installed (richer output).
+    """
+    try:
+        import html2text  # type: ignore
+
+        h = html2text.HTML2Text()
+        h.ignore_links = False
+        h.ignore_images = True
+        h.body_width = 0  # don't wrap
+        return h.handle(html).strip()
+    except ImportError:
+        pass
+
+    # Pure-stdlib fallback
+    text = _HTML_BR_RE.sub("\n", html)
+    text = _HTML_P_RE.sub("\n", text)
+    text = _HTML_TAG_RE.sub("", text)
+    # Decode minimal entities
+    import html as _html_mod
+    text = _html_mod.unescape(text)
+    # Collapse 3+ newlines to 2
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text
+
+
+def _truncate_body(body: str) -> str:
+    """Truncate to BODY_MAX_BYTES, append TRUNCATED_MARKER if cut."""
+    encoded = body.encode("utf-8")
+    if len(encoded) <= BODY_MAX_BYTES:
+        return body
+    # Cut at byte boundary then back off to last whitespace to avoid mid-word
+    cut = encoded[:BODY_MAX_BYTES].decode("utf-8", errors="ignore")
+    # Trim back to last whitespace (best-effort)
+    last_ws = max(cut.rfind(" "), cut.rfind("\n"))
+    if last_ws > 0 and last_ws > BODY_MAX_BYTES - 200:
+        cut = cut[:last_ws]
+    return cut.rstrip() + TRUNCATED_MARKER
+
+
+# ───────────────────────── Gmail message parsing ─────────────────────────
+
+def _extract_header(headers: list[dict], name: str) -> str:
+    target = name.lower()
+    for h in headers:
+        if h.get("name", "").lower() == target:
+            return h.get("value", "")
+    return ""
+
+
+def _walk_parts_for_body(payload: dict) -> tuple[str, str]:
+    """Return (plain_text, html). Either may be ''. Prefer plain over html."""
+    plain_chunks: list[str] = []
+    html_chunks: list[str] = []
+
+    def _walk(part: dict) -> None:
+        mime = part.get("mimeType", "")
+        body = part.get("body", {})
+        data = body.get("data", "")
+        if data:
+            import base64
+            try:
+                decoded = base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
+            except Exception:
+                decoded = ""
+            if mime == "text/plain":
+                plain_chunks.append(decoded)
+            elif mime == "text/html":
+                html_chunks.append(decoded)
+        for sub in part.get("parts", []) or []:
+            _walk(sub)
+
+    _walk(payload)
+    return "\n".join(plain_chunks).strip(), "\n".join(html_chunks).strip()
+
+
+def _parse_message(msg: dict) -> dict | None:
+    """Return parsed dict {from_addr, subject, body, msg_id} or None to discard."""
+    msg_id = msg.get("id", "")
+    payload = msg.get("payload", {}) or {}
+    headers = payload.get("headers", []) or []
+
+    from_raw = _extract_header(headers, "From")
+    subject = _extract_header(headers, "Subject")
+    _, from_addr = parseaddr(from_raw)
+    from_addr = from_addr.lower().strip()
+
+    plain, html = _walk_parts_for_body(payload)
+    if plain:
+        body_text = plain
+    elif html:
+        body_text = _html_to_text(html)
+    else:
+        body_text = ""
+
+    return {
+        "msg_id": msg_id,
+        "from_addr": from_addr,
+        "subject": subject,
+        "body_raw": body_text,
+    }
+
+
+# ───────────────────────── Auth / Gmail service ─────────────────────────
+
+def _load_credentials():
+    """Load + refresh OAuth credentials. Exit 1 if no token (unless caller is --auth)."""
+    try:
+        from google.oauth2.credentials import Credentials  # type: ignore
+        from google.auth.transport.requests import Request  # type: ignore
+    except ImportError as e:
+        sys.stderr.write(
+            "email_poller: missing google auth deps — install with:\n"
+            "  pip3 install --user google-api-python-client google-auth-httplib2 google-auth-oauthlib html2text\n"
+            f"(import error: {e})\n"
+        )
+        sys.exit(1)
+
+    if not TOKEN_PATH.exists():
+        sys.stderr.write(
+            f"email_poller: no token at {TOKEN_PATH}\n"
+            "run --auth first to complete one-time OAuth flow:\n"
+            f"  python3 {Path(__file__).name} --auth\n"
+        )
+        sys.exit(1)
+
+    creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), GMAIL_SCOPES)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        TOKEN_PATH.write_text(creds.to_json())
+        os.chmod(TOKEN_PATH, 0o600)
+    return creds
+
+
+def _build_service(creds):
+    from googleapiclient.discovery import build  # type: ignore
+    return build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+
+def _run_auth_flow() -> int:
+    """One-time browser OAuth flow. Saves refresh token to TOKEN_PATH."""
+    try:
+        from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
+    except ImportError:
+        sys.stderr.write(
+            "email_poller: missing google-auth-oauthlib — install with:\n"
+            "  pip3 install --user google-auth-oauthlib\n"
+        )
+        return 1
+
+    if not CLIENT_SECRETS_PATH.exists():
+        sys.stderr.write(
+            f"email_poller: no client secrets at {CLIENT_SECRETS_PATH}\n"
+            "create an OAuth2 Desktop client at https://console.cloud.google.com/apis/credentials\n"
+            f"download the JSON and save it as: {CLIENT_SECRETS_PATH}\n"
+            "then re-run --auth\n"
+        )
+        return 1
+
+    flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRETS_PATH), GMAIL_SCOPES)
+    # run_local_server opens browser, listens on a random port for redirect
+    creds = flow.run_local_server(port=0)
+    TOKEN_PATH.write_text(creds.to_json())
+    os.chmod(TOKEN_PATH, 0o600)
+    log.info("auth complete — token saved to %s", TOKEN_PATH)
+    return 0
+
+
+# ───────────────────────── Poll loop ─────────────────────────
+
+def _process_message(parsed: dict, *, dry_run: bool, service=None) -> str:
+    """Process one parsed message. Returns one-word verdict for log."""
+    from_addr = parsed["from_addr"]
+    subject = parsed["subject"]
+    body_raw = parsed["body_raw"]
+    msg_id = parsed["msg_id"]
+
+    if from_addr not in ALLOWED_SENDERS:
+        log.warning("discard: sender %r not in allowlist (msg=%s)", from_addr, msg_id)
+        return "discard"
+
+    # Combine subject + body for tag extraction. Strip "MEMO:" prefix from subject.
+    subject_for_tags = re.sub(r"^\s*MEMO\s*:\s*", "", subject, count=1, flags=re.IGNORECASE)
+    combined = subject_for_tags.strip() + "\n\n" + body_raw.strip()
+
+    cleaned, tags = _extract_tags(combined)
+    body_final = _truncate_body(cleaned.strip() or subject_for_tags or "(empty)")
+
+    if dry_run:
+        log.info("DRY: would write from=%s tags=%s len=%d", from_addr, tags, len(body_final))
+        return "dry-write"
+
+    # Late import — _writer pulls in index.py with its own paths
+    from _writer import write_memo  # noqa: E402
+
+    path = write_memo(
+        body=body_final,
+        channel="email",
+        source=from_addr,
+        tags=tags,
+    )
+    log.info("write: %s tags=%s from=%s", path.name, tags, from_addr)
+
+    # Mark as read by removing UNREAD label
+    if service is not None:
+        try:
+            service.users().messages().modify(
+                userId="me",
+                id=msg_id,
+                body={"removeLabelIds": ["UNREAD"]},
+            ).execute()
+        except Exception as e:
+            log.error("mark-read failed for %s: %s", msg_id, e)
+            return "write-but-not-marked"
+    return "write"
+
+
+def _poll(*, dry_run: bool) -> int:
+    creds = _load_credentials()
+    service = _build_service(creds)
+
+    resp = service.users().messages().list(userId="me", q=GMAIL_QUERY, maxResults=50).execute()
+    msgs = resp.get("messages", []) or []
+    log.info("poll: %d unread matching %r", len(msgs), GMAIL_QUERY)
+
+    counts = {"write": 0, "dry-write": 0, "discard": 0, "write-but-not-marked": 0, "error": 0}
+    for stub in msgs:
+        try:
+            full = service.users().messages().get(
+                userId="me", id=stub["id"], format="full"
+            ).execute()
+            parsed = _parse_message(full)
+            if parsed is None:
+                continue
+            verdict = _process_message(
+                parsed,
+                dry_run=dry_run,
+                service=None if dry_run else service,
+            )
+            counts[verdict] = counts.get(verdict, 0) + 1
+        except Exception as e:
+            log.exception("error processing %s: %s", stub.get("id"), e)
+            counts["error"] += 1
+
+    log.info("poll done: %s", counts)
+    return 0 if counts["error"] == 0 else 1
+
+
+# ───────────────────────── Mock-poll for tests ─────────────────────────
+
+def _mock_poll(mock_messages: list[dict], *, dry_run: bool = True) -> dict:
+    """Run the parsing + dispatch logic against synthetic Gmail-shaped dicts.
+
+    Used by RC-3 test. No network. mock_messages is a list of payload-shaped
+    dicts matching `messages.get(format='full')` structure.
+    """
+    counts = {"write": 0, "dry-write": 0, "discard": 0, "error": 0}
+    written: list[str] = []
+
+    for m in mock_messages:
+        try:
+            parsed = _parse_message(m)
+            if parsed is None:
+                continue
+            verdict = _process_message(parsed, dry_run=dry_run, service=None)
+            if verdict not in counts:
+                counts[verdict] = 0
+            counts[verdict] += 1
+            if verdict == "write":
+                # In non-dry mode we'd have a path; in dry we skip
+                pass
+        except Exception as e:
+            log.exception("mock error: %s", e)
+            counts["error"] += 1
+    return counts
+
+
+# ───────────────────────── Main ─────────────────────────
+
+def main(argv: list[str]) -> int:
+    p = argparse.ArgumentParser(description="memo-v2 email channel poller")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--auth", action="store_true", help="run one-time browser OAuth flow")
+    g.add_argument("--poll", action="store_true", help="fetch unread, write, mark read")
+    g.add_argument("--dry-run", action="store_true", help="like --poll but no writes/no mark-read")
+    args = p.parse_args(argv)
+
+    if args.auth:
+        return _run_auth_flow()
+    if args.poll:
+        return _poll(dry_run=False)
+    if args.dry_run:
+        return _poll(dry_run=True)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
