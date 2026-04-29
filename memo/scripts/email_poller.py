@@ -258,6 +258,53 @@ def _build_service(creds):
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
 
 
+def _get_or_create_label(service, label_name: str = MEMO_PROCESSED_LABEL) -> str:
+    """Return the Gmail label id for `label_name`, creating it if absent.
+
+    Module-level cache (_LABEL_ID_CACHE) skips API calls on subsequent invocations
+    within the same process. On cache miss, lists user labels and returns id if
+    present; otherwise creates the label (visible in label list + message list)
+    and returns the new id. `gmail.modify` scope covers both labels.list and
+    labels.create. Raises googleapiclient.errors.HttpError on API failure with
+    the original error context preserved.
+    """
+    cached = _LABEL_ID_CACHE.get(label_name)
+    if cached:
+        log.debug("label cache HIT: %s -> %s", label_name, cached)
+        return cached
+
+    from googleapiclient.errors import HttpError  # type: ignore
+
+    try:
+        existing = service.users().labels().list(userId="me").execute()
+    except HttpError as e:
+        raise RuntimeError(f"labels.list failed for {label_name!r}: {e}") from e
+
+    for lab in existing.get("labels", []) or []:
+        if lab.get("name") == label_name:
+            label_id = lab.get("id", "")
+            _LABEL_ID_CACHE[label_name] = label_id
+            log.debug("label cache MISS, found existing: %s -> %s", label_name, label_id)
+            return label_id
+
+    try:
+        created = service.users().labels().create(
+            userId="me",
+            body={
+                "name": label_name,
+                "labelListVisibility": "labelShow",
+                "messageListVisibility": "show",
+            },
+        ).execute()
+    except HttpError as e:
+        raise RuntimeError(f"labels.create failed for {label_name!r}: {e}") from e
+
+    label_id = created.get("id", "")
+    _LABEL_ID_CACHE[label_name] = label_id
+    log.info("label created: %s -> %s", label_name, label_id)
+    return label_id
+
+
 def _run_auth_flow() -> int:
     """One-time browser OAuth flow. Saves refresh token to TOKEN_PATH."""
     try:
