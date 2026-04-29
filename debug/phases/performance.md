@@ -34,6 +34,26 @@ If `--baseline=<file>` provided: read prior baseline, compute deltas. Else: capt
 
 ---
 
+## Step 1.5 MINIMISE (performance variant — added 2026-04-29)
+
+After REPRODUCE captures the baseline metrics, MINIMISE shrinks the workload until ONLY the offending metric still busts budget. Pocock/skills `diagnose` (MIT) — performance shape.
+
+Differs from bug-mode MINIMISE: not "still fails" but "still over budget on the metric that triggered the symptom." Goal is isolating the load-bearing axis (concurrency, payload size, dataset rows, request rate).
+
+- Identify which baseline metric is over budget (e.g. `mem_growth_1h_pct`, `fill_latency_p99`).
+- Shrink the workload along **one axis at a time**: request volume, payload size, concurrency, dataset rows.
+- Re-capture the baseline after each shrink.
+- KEEP the shrink if the offending metric still busts budget; REVERT if budget recovers.
+- Halt when no further shrink leaves the budget bust intact.
+
+Output:
+- `experiments/workload-min.sh` — smallest workload that still triggers the perf regression
+- `state/minimise-log.md` — per-shrink table: `# | Shrunk | Offending metric | Still over budget? | Decision`
+
+The result tells you which axis the regression depends on — that drives Step 6 HYPOTHESIS.
+
+---
+
 ## Step 8 INSTRUMENT — perf marker pattern
 
 `[DEBUG H1]` tagged log lines wrapped in `#region DEBUG ... #endregion` reversible blocks; sink → `~/.claude/debug.log`. Step 14 CLEANUP strips on close.
