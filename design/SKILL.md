@@ -72,14 +72,17 @@ Multiple signals → the more specific wins (project alias > swift file > manife
 
 ## Empty-prompt default routing
 
-If user invokes `/design` with no axes named:
+If user invokes `/design` with no axes named, fall back to `project-aliases.md` defaults:
 
-| Surface (auto-detected) | Default direction | Default register |
+| Surface (auto-detected) | Default vibe | Default archetype |
 |---|---|---|
-| SwiftUI / VibeIsland | `tech-utility` | `craft-artisan` |
-| Chrome extension | `modern-minimal` | `startup-techy` |
-| Web dashboard / PM bot | `tech-utility` | `enterprise-trust` |
-| Marketing / landing / blog | ASK 1 question (editorial vs minimal vs brutalist) | inferred from direction |
+| SwiftUI / VibeIsland | `bloomberg-terminal` (or `apple-clean` if user signals light) | `dashboard` |
+| PM bot dashboard / Hel / London | `bloomberg-terminal` | `dashboard` |
+| Dagou dashboard | `cyberpunk` | `dashboard` |
+| Chrome extension | `apple-clean` | `popup` |
+| NardoWorld wiki | `dark-academia` | `landing` |
+| Big-D daemons panel | `bloomberg-terminal` | `dashboard` |
+| Marketing / landing (no project alias) | ASK 1 question (name 1 reference brand, movie, era, or image) | inferred |
 
 ---
 
