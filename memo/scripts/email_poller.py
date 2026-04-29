@@ -620,7 +620,7 @@ def _mock_poll(mock_messages: list[dict], *, dry_run: bool = True) -> dict:
     Used by RC-3 test. No network. mock_messages is a list of payload-shaped
     dicts matching `messages.get(format='full')` structure.
     """
-    counts = {"write": 0, "dry-write": 0, "discard": 0, "error": 0}
+    counts: dict[str, int] = {"write": 0, "dry-write": 0, "error": 0}
     written: list[str] = []
 
     for m in mock_messages:
