@@ -53,10 +53,10 @@ awk -v flag="$FLAG" -v existing="$EXISTING_CHANNELS" '
   line = $0
   # Only operate on lines invoking ~/.local/bin/claude (the live binary path)
   if (line ~ /~\/\.local\/bin\/claude/ && line !~ flag) {
-    if (line ~ ("--channels[^ ]*" existing)) {
+    if (line ~ ("--channels +" existing)) {
       # Case A: existing --channels flag present → append ",FLAG" to its value
-      # Use sub() with a capture-style replacement (BSD awk: no gensub)
-      sub(("--channels " existing), ("--channels " existing "," flag), line)
+      # BSD awk: no gensub, use sub() with literal anchor
+      sub(("--channels +" existing), ("--channels " existing "," flag), line)
     } else if (line ~ /--model sonnet/ && line !~ /--channels/) {
       # Case B: no --channels flag → insert one after --model sonnet
       sub(/--model sonnet/, ("--model sonnet --channels " flag), line)
