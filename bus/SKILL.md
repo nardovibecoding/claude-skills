@@ -20,6 +20,7 @@ Lets multiple Claude Code sessions on this machine talk. One session opts in (`/
 | `/radio ask <name> "msg"` | ask | recipient responds fully; reply auto-relayed back | `/radio ask B "status?"` |
 | `/radio all "msg"` | notify | broadcast to every joined peer | `/radio all "shipped X"` |
 | `/radio consensus <q>` | consensus | 3-round vote, 75% threshold, 60s/round | `/radio consensus "pg or mysql?"` |
+| `/radio reply <name> <msg_id> "msg"` | reply | send reply back to named peer; links to original by msg_id | `/radio reply A 11111-999 "done"` |
 | `@A msg` | notify | syntax alias for `/radio tell A "msg"` | `@A heads up` |
 | `@all msg` | notify | syntax alias for `/radio all "msg"` | `@all going AFK` |
 
