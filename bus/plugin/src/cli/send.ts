@@ -39,7 +39,7 @@ import type { BusEnvelope, BusMode } from "../types.js";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
-type Verb = "tell" | "ask" | "all" | "consensus" | "reply";
+type Verb = "tell" | "ask" | "all" | "consensus" | "reply" | "vote";
 
 const VERB_TO_MODE: Record<Verb, BusMode> = {
   tell: "notify",
@@ -47,6 +47,7 @@ const VERB_TO_MODE: Record<Verb, BusMode> = {
   all: "notify",
   consensus: "consensus",
   reply: "reply",
+  vote: "consensus",
 };
 
 function die(msg: string, code = 2): never {
