@@ -137,28 +137,7 @@ The plugin reads this **once on startup**. If you joined after `claude` started 
 
 ## Step 4 — Heartbeat + idle auto-stop
 
-Background loop, every 30s; auto-stop after 900s quiet AND 0 peers:
-
-```bash
-nohup bash -c '
-  while true; do
-    jq -cn --arg n "'"$NAME"'" --arg sid "'"$SID"'" --argjson ts $(date +%s) \
-      "{name:\$n, session_id:\$sid, ts:\$ts}" >> ~/.claude/bus/registry.jsonl
-    last=$(tail -20 ~/.claude/bus/all.jsonl 2>/dev/null | jq -r ".ts" | sort | tail -1)
-    last_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${last%.*}" +%s 2>/dev/null || echo 0)
-    peers=$(jq -s "group_by(.name) | map(max_by(.ts)) |
-                   map(select(.ts >= (now - 60) and .name != \"'"$NAME"'\")) | length" \
-                   ~/.claude/bus/registry.jsonl 2>/dev/null)
-    now=$(date +%s)
-    if [ $((now - last_epoch)) -gt 900 ] && [ "${peers:-0}" -le 0 ]; then
-      BUS_NAME='"$NAME"' bun run ~/.claude/skills/bus/plugin/src/cli/send.ts all "$NAME idle-stop"
-      rm -f ~/.claude/bus/opted-in/'"$SID"'
-      exit 0
-    fi
-    sleep 30
-  done
-' >/dev/null 2>&1 &
-```
+Background `while true` loop, sleep 30s. Each tick: re-append registry entry (`{name, session_id, ts}`); check `tail -20 ~/.claude/bus/all.jsonl` for last ts; check peer count via dedupe-by-name. If `now - last_msg > 900` AND `peers == 0`: broadcast `"$NAME idle-stop"` via send.ts, `rm` sentinel, exit. Run with `run_in_background: true`; record task_id for `/radio stop`.
 
 ## Step 5 — Send verbs (single shared writer)
 
