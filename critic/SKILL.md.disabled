@@ -1,18 +1,18 @@
 ---
 name: critic
 description: |
-  Adversarial red team — find security holes, logic bugs, wasted resources.
+  Adversarial red team on demand — spawn a background agent that finds security holes, logic bugs, wasted resources, edge cases.
   Triggers: "critic", "red team", "attack this", "what's wrong", "find flaws", "challenge this".
-  NOT FOR: code review before merge (use review), debugging (use systematic-debugging).
-  Produces: prioritized list of flaws with severity and remediation steps.
+  NOT FOR: code review before merge (use review), debugging a known symptom (use /debug).
+  Produces: prioritized list of flaws with severity (CRITICAL > HIGH > MEDIUM > LOW) and remediation steps.
 user-invocable: true
 ---
 
 # Critic — Adversarial Self-Review
 
-Three modes: on-demand, post-change, and scheduled red team.
+Single mode: on-demand. (Older versions described auto-run-on-diff and Sunday-cron modes; both stripped 2026-04-30 — never wired, never used, removed to stop misleading prose.)
 
-## Mode 1: On-Demand Critic (/critic)
+## /critic — on-demand adversarial agent
 
 Spawn a background agent with this adversarial prompt:
 
