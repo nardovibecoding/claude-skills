@@ -82,7 +82,7 @@ if $ALL_FLAG; then
   for p in "${RELEASED[@]:-}"; do
     [ -n "$p" ] || continue
     if [ -f "$SEND" ]; then
-      BUS_NAME="$NAME" bun run "$SEND" all "unlock release $p" 2>/dev/null || true
+      BUS_NAME="$NAME" bun run "$SEND" all "unlock release $p" >/dev/null 2>&1 || true
     fi
   done
 
