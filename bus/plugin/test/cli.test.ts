@@ -6,7 +6,7 @@
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
