@@ -199,14 +199,67 @@ def scan_hooks() -> list[Finding]:
     return out
 
 
+def grep_refs(needle: str, roots: list[Path]) -> int:
+    """Count references to `needle` across roots. Returns 0 fast on no-match."""
+    args = ["grep", "-rl", "--binary-files=without-match", needle]
+    for r in roots:
+        if r.exists():
+            args.append(str(r))
+    if len(args) <= 4:
+        return 0
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=15)
+        return len([ln for ln in r.stdout.splitlines() if ln.strip()])
+    except Exception:
+        return 0
+
+
 def scan_agents() -> list[Finding]:
-    """Agents are wired by name when referenced via subagent_type. Light scan."""
-    return scan_dir_generic("agents", AGENTS_DIR, (".md",), set(), set(), set())
+    """Agents are wired by name when subagent_type references them across
+    skills, rules, CLAUDE.md, hooks. Grep filename stem across those trees."""
+    out: list[Finding] = []
+    if not AGENTS_DIR.exists():
+        return out
+    files = [p for p in AGENTS_DIR.iterdir() if p.is_file()]
+    roots = [HOME / ".claude/skills", HOME / ".claude/rules",
+             HOME / ".claude/CLAUDE.md", HOOKS_DIR]
+    # D1/D2/D3 reusable from generic
+    out.extend(scan_dir_generic("agents", AGENTS_DIR, ("__noop__",), set(), set(), set()))
+    # D4 with proper wired detection
+    for p in files:
+        if not p.name.endswith(".md"):
+            continue
+        if p.name.startswith("_"):
+            continue
+        stem = p.name[:-3]
+        # Exclude self-reference: subtract 1 if stem appears in own file (always)
+        refs = grep_refs(stem, roots)
+        if refs == 0:
+            out.append(Finding("agents", "MEDIUM", "D4", str(p),
+                               f"orphan: '{stem}' not referenced in skills/rules/CLAUDE.md/hooks"))
+    return out
 
 
 def scan_scripts() -> list[Finding]:
-    """Scripts are wired by ref from hooks/skills/LaunchAgents."""
-    return scan_dir_generic("scripts", SCRIPTS_DIR, (".py", ".sh"), set(), set(), set())
+    """Scripts are wired when referenced from LaunchAgents plists, hooks,
+    skills, or this skill's own dispatcher."""
+    out: list[Finding] = []
+    if not SCRIPTS_DIR.exists():
+        return out
+    files = [p for p in SCRIPTS_DIR.iterdir() if p.is_file()]
+    roots = [LAUNCHAGENTS_DIR, HOOKS_DIR, HOME / ".claude/skills",
+             HOME / ".claude/CLAUDE.md", HOME / ".claude/rules"]
+    out.extend(scan_dir_generic("scripts", SCRIPTS_DIR, ("__noop__",), set(), set(), set()))
+    for p in files:
+        if not (p.name.endswith(".py") or p.name.endswith(".sh")):
+            continue
+        if p.name.startswith("_"):
+            continue
+        refs = grep_refs(p.name, roots)
+        if refs == 0:
+            out.append(Finding("scripts", "MEDIUM", "D4", str(p),
+                               f"orphan: '{p.name}' not referenced in LaunchAgents/hooks/skills"))
+    return out
 
 
 def scan_launchagents() -> list[Finding]:
