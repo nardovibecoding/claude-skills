@@ -93,6 +93,7 @@ Source: obra/superpowers (MIT). Both laws apply to all /debug modes; full enforc
 | "X used to work, now stale" | Drift (Group A) | `phases/drift.md` |
 | "X is flaky / sometimes fails" | Flaky (Group A) | `phases/flaky.md` |
 | "X wedged / frozen in kernel / D-state / SIGTERM hangs / process alive but silent" | Wedge (Group A) | `phases/wedge.md` |
+| "what's wrong with X" / "red team X" / "find flaws in X" / "attack X" / "critic X" | Critic (Group D) | `phases/critic.md` |
 | (daemon-driven, no phrase) | Orphan / Zombie (Group C) | consistency-daemon detector (S5) |
 
 Shipped modes: Wiring (S1) + Bug (S3) + Drift/Flaky/Performance (S8) + ledger view. Zombie / Orphan modes remain daemon-driven (S5 not yet shipped).
