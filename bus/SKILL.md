@@ -200,12 +200,4 @@ echo "Radio stopped. Plugin tails killed; sentinel removed; registry entry expir
 
 ## References
 
-- Writer (single source): `~/.claude/skills/bus/plugin/src/writer.ts`
-- Send CLI (skill→writer adapter): `~/.claude/skills/bus/plugin/src/cli/send.ts`
-- Plugin server: `~/.claude/skills/bus/plugin/server.ts`
-- Session id walker: `~/.claude/skills/bus/plugin/src/session.ts`
-- Sentinel reader/sweeper: `~/.claude/skills/bus/plugin/src/sentinel.ts`
-- Spool tailer: `~/.claude/skills/bus/plugin/src/spool.ts`
-- Envelope schema: `~/.claude/skills/bus/plugin/src/types.ts`
-- Spec + plan: `~/.ship/bus-channel-redesign/goals/{01-spec.md, 02-plan.md}`
-- v1 backup: `~/.claude/skills/bus/SKILL.md.v1-backup`
+`plugin/src/{writer,session,sentinel,spool,types}.ts`, `plugin/src/cli/send.ts`, `plugin/server.ts`, `~/.ship/bus-channel-redesign/goals/{01-spec.md,02-plan.md}`. v1 archived at `SKILL.md.v1-backup`.
