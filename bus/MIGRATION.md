@@ -30,7 +30,7 @@
 | send            | python script appends jsonl                 | TypeScript CLI `bun src/cli/send.ts ...`                    |
 | modes           | implicit                                    | explicit envelope `mode: notify|ask|reply|consensus`        |
 | dormancy        | constant tail in shell                      | plugin idle until sentinel present, then push               |
-| hook            | `bus_reminder.py` PreCompact polling        | hook scheduled for retirement in S8 (still wired today)     |
+| hook            | `bus_reminder.py` PreCompact polling        | hook decommissioned in S8 (`bus_reminder.py.disabled`, settings.json scrubbed) |
 
 ---
 
