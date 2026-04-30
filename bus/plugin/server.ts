@@ -45,6 +45,7 @@ const SERVER_VERSION = "0.1.0";
 const BUS_ROOT = path.join(os.homedir(), ".claude", "bus");
 const BROADCAST_PATH = path.join(BUS_ROOT, "all.jsonl");
 const INBOX_DIR = path.join(BUS_ROOT, "inbox");
+const PLUGIN_PID_DIR = path.join(BUS_ROOT, "plugin-pid");
 
 function log(action: string, kvs: Record<string, string | number> = {}): void {
   const parts = Object.entries(kvs).map(([k, v]) => `${k}=${v}`);
