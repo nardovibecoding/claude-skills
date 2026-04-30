@@ -108,7 +108,6 @@ describe("send.ts CLI", () => {
   });
 
   test("T5 missing BUS_NAME exits non-zero", () => {
-    const r = run(["all", "x"], {});
     // Strip BUS_NAME explicitly
     const r2 = spawnSync("bun", ["run", SEND, "all", "x"], {
       encoding: "utf8",
