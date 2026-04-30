@@ -170,7 +170,7 @@ async function main(): Promise<void> {
 }
 
 // Test-only export (skips main() when imported)
-export { parseArgs, VERB_TO_MODE };
+export { parseArgs, VERB_TO_MODE, resolveNameToSid };
 
 if (import.meta.main) {
   await main();
