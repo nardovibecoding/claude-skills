@@ -119,15 +119,26 @@ describe("send.ts vote verb", () => {
     expect(result.payload).toBe("disagree: too risky");
   });
 
-  test("T3c vote with invalid round -> exits non-zero (die path)", () => {
-    // parseArgs calls die() which calls process.exit(2). In test we catch the error.
-    // Bun's process.exit in test context throws; wrap to confirm.
-    // We check the invalid round path indirectly via the integer check.
-    expect(() => parseArgs(["vote", "99999-c-123", "4", "agree", "reason"])).toThrow();
+  test("T3c vote with invalid round -> subprocess exits non-zero", () => {
+    const { spawnSync } = require("node:child_process");
+    const SEND = require("node:path").resolve(__dirname, "..", "src", "cli", "send.ts");
+    const r = spawnSync("bun", ["run", SEND, "vote", "99999-c-123", "4", "agree", "reason"], {
+      encoding: "utf8",
+      env: { ...process.env, BUS_NAME: "A" },
+    });
+    expect(r.status).not.toBe(0);
+    expect((r.stderr ?? "").toString()).toContain("vote round must be 1-3");
   });
 
-  test("T3d vote with invalid stance -> throws", () => {
-    expect(() => parseArgs(["vote", "99999-c-123", "1", "maybe", "reason"])).toThrow();
+  test("T3d vote with invalid stance -> subprocess exits non-zero", () => {
+    const { spawnSync } = require("node:child_process");
+    const SEND = require("node:path").resolve(__dirname, "..", "src", "cli", "send.ts");
+    const r = spawnSync("bun", ["run", SEND, "vote", "99999-c-123", "1", "maybe", "reason"], {
+      encoding: "utf8",
+      env: { ...process.env, BUS_NAME: "A" },
+    });
+    expect(r.status).not.toBe(0);
+    expect((r.stderr ?? "").toString()).toContain("stance must be agree|disagree");
   });
 });
 
