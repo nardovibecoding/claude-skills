@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { mkdtempSync, rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, realpathSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { spawnSync } from "child_process";
