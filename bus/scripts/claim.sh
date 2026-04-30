@@ -138,10 +138,10 @@ fi
 _bus_claims_lock_release
 trap - EXIT INT TERM
 
-# Broadcast outside critical section (best-effort).
+# Broadcast outside critical section (best-effort). Redirect all output to stderr.
 SEND="$SCRIPT_DIR/../plugin/src/cli/send.ts"
 if [ -f "$SEND" ]; then
-  BUS_NAME="$NAME" bun run "$SEND" all "lock claim $ABS_PATH" 2>/dev/null || true
+  BUS_NAME="$NAME" bun run "$SEND" all "lock claim $ABS_PATH" >/dev/null 2>&1 || true
 fi
 
 printf '%s\n' "$RESULT"
