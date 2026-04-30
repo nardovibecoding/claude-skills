@@ -133,18 +133,23 @@ async function main(): Promise<void> {
     payload,
   };
 
-  const replyTo = process.env.BUS_IN_REPLY_TO;
+  // in_reply_to: prefer explicit arg (reply verb), then env fallback.
+  const replyTo = inReplyTo ?? process.env.BUS_IN_REPLY_TO;
   if (replyTo) envelope.in_reply_to = replyTo;
 
   try {
     if (verb === "all" || verb === "consensus") {
       await appendBroadcast(envelope);
     } else if (verb === "reply") {
-      // target = original sender's session_id for reply routing
-      if (!/^\d+$/.test(target!)) {
-        die(`reply target must be numeric session_id, got: ${target}`);
-      }
-      await appendReply(target!, envelope);
+      // target may be a bus name or numeric sid; resolve_name.sh handles both.
+      const recipientSid = resolveNameToSid(target!);
+      // appendReply enriches envelope with mode=reply + reply_from.
+      const out = await appendReply(recipientSid, { ...envelope, reply_from: busName });
+      void out;
+      process.stdout.write(
+        JSON.stringify({ ok: true, msg_id, in_reply_to: replyTo ?? null }) + "\n",
+      );
+      process.exit(0);
     } else {
       // tell / ask: target is the resolved sessionId (skill resolves name→sid)
       const targetSid = process.env.BUS_TARGET_SID ?? target!;
