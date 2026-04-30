@@ -130,7 +130,7 @@ _bus_claims_lock_release
 trap - EXIT INT TERM
 
 if [ -f "$SEND" ]; then
-  BUS_NAME="$NAME" bun run "$SEND" all "unlock release $ABS_PATH" 2>/dev/null || true
+  BUS_NAME="$NAME" bun run "$SEND" all "unlock release $ABS_PATH" >/dev/null 2>&1 || true
 fi
 
 jq -cn --arg p "$ABS_PATH" '{ok:true, released:[$p]}'
