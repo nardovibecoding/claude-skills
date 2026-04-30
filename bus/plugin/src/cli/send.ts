@@ -65,7 +65,7 @@ function parseArgs(argv: string[]): {
   const verb = argv[0] as Verb;
   if (!(verb in VERB_TO_MODE)) die(`unknown verb: ${verb}`);
 
-  if (verb === "all" || verb === "consensus") {
+  if (verb === "all" || verb === "consensus" || verb === "vote") {
     if (argv.length !== 2) die(`${verb} takes exactly 1 arg: <payload>`);
     return { verb, payload: argv[1]! };
   }
