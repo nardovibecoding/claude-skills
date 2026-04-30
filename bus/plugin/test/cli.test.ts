@@ -125,4 +125,62 @@ describe("send.ts CLI", () => {
     expect(env.mode).toBe("consensus");
     expect(env.to).toBe("all");
   });
+
+  test("T7 reply verb with numeric sid writes mode=reply + reply_from + in_reply_to to recipient inbox", () => {
+    const recipientSid = "22222";
+    const origMsgId = "11111-1234567890";
+    const r = run(
+      ["reply", recipientSid, origMsgId, "pong"],
+      { BUS_NAME: "B" },
+    );
+    expect(r.code).toBe(0);
+    const parsed = JSON.parse(r.out);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.in_reply_to).toBe(origMsgId);
+
+    const inboxFile = path.join(tmpHome, ".claude", "bus", "inbox", `${recipientSid}.jsonl`);
+    expect(existsSync(inboxFile)).toBe(true);
+    const env = JSON.parse(readFileSync(inboxFile, "utf8").trim());
+    expect(env.mode).toBe("reply");
+    expect(env.reply_from).toBe("B");
+    expect(env.in_reply_to).toBe(origMsgId);
+    expect(env.payload).toBe("pong");
+    expect(env.from).toBe("B");
+  });
+
+  test("T8 reply with name target resolves via resolve_name.sh (registry)", () => {
+    // Seed a registry entry for name "A" with session_id 11111.
+    const busDir = path.join(tmpHome, ".claude", "bus");
+    const registry = path.join(busDir, "registry.jsonl");
+    const ts = new Date().toISOString();
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(registry, JSON.stringify({ name: "A", session_id: "11111", ts }) + "\n");
+
+    const origMsgId = "99999-111";
+    const r = run(["reply", "A", origMsgId, "hello A"], { BUS_NAME: "B" });
+    expect(r.code).toBe(0);
+
+    const inboxFile = path.join(busDir, "inbox", "11111.jsonl");
+    expect(existsSync(inboxFile)).toBe(true);
+    const env = JSON.parse(readFileSync(inboxFile, "utf8").trim());
+    expect(env.mode).toBe("reply");
+    expect(env.reply_from).toBe("B");
+    expect(env.in_reply_to).toBe(origMsgId);
+    expect(env.to).toBe("A");
+  });
+
+  test("T9 reply with numeric sid target passes through without registry lookup", () => {
+    // No registry file exists — numeric sid must not trigger resolve_name.sh lookup.
+    const recipientSid = "55555";
+    const origMsgId = "44444-999";
+    const r = run(["reply", recipientSid, origMsgId, "direct-sid-reply"], { BUS_NAME: "C" });
+    // Should succeed even without registry present.
+    expect(r.code).toBe(0);
+
+    const inboxFile = path.join(tmpHome, ".claude", "bus", "inbox", `${recipientSid}.jsonl`);
+    const env = JSON.parse(readFileSync(inboxFile, "utf8").trim());
+    expect(env.mode).toBe("reply");
+    expect(env.reply_from).toBe("C");
+    expect(env.in_reply_to).toBe(origMsgId);
+  });
 });
