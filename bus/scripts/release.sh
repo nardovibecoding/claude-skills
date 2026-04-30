@@ -98,7 +98,7 @@ if [ -z "$TARGET_PATH" ]; then
 fi
 
 case "$TARGET_PATH" in
-  *[\;\&\|\\\$\`\n]*)
+  *[';''&''|''$''`']* | *$'\n'*)
     jq -cn '{ok:false, reason:"illegal_chars_in_path"}'; exit 1 ;;
 esac
 
