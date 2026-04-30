@@ -46,8 +46,16 @@ function validateEnvelope(env: BusEnvelope): void {
         throw new TypeError(`mode=consensus requires field: ${key}`);
       }
     }
-    if (typeof env.round !== "number" || env.round < 1 || env.round > 3) {
-      throw new TypeError(`consensus round must be 1, 2, or 3; got: ${env.round}`);
+    // round 0 is allowed for kind=verdict (final announcement); rounds 1-3 for question/vote.
+    const isVerdict = env.kind === "verdict";
+    if (typeof env.round !== "number" || env.round < 0 || env.round > 3) {
+      throw new TypeError(`consensus round must be 0 (verdict) or 1-3; got: ${env.round}`);
+    }
+    if (!isVerdict && env.round === 0) {
+      throw new TypeError(`round=0 only valid for kind=verdict; got kind=${env.kind}`);
+    }
+    if (isVerdict && env.round !== 0) {
+      throw new TypeError(`kind=verdict must use round=0; got round=${env.round}`);
     }
     if (!CONSENSUS_KINDS.has(env.kind!)) {
       throw new TypeError(`invalid consensus kind: ${env.kind}`);
