@@ -156,7 +156,10 @@ describe("send.ts CLI", () => {
     writeFileSync(registry, JSON.stringify({ name: "A", session_id: "11111", ts }) + "\n");
 
     const origMsgId = "99999-111";
-    const r = run(["reply", "A", origMsgId, "hello A"], { BUS_NAME: "B" });
+    const r = run(["reply", "A", origMsgId, "hello A"], {
+      BUS_NAME: "B",
+      BUS_DIR: path.join(tmpHome, ".claude", "bus"),
+    });
     expect(r.code).toBe(0);
 
     const inboxFile = path.join(busDir, "inbox", "11111.jsonl");
