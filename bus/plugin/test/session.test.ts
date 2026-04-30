@@ -2,7 +2,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import {
   resolveSessionId,
   _resetSessionIdCacheForTests,
