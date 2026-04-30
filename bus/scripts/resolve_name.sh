@@ -45,9 +45,9 @@ CUTOFF=$((NOW - 60))
 
 SID=$(jq -sr --arg n "$ARG" --argjson cutoff "$CUTOFF" \
   '[.[] | select(.name == $n) | select(.ts != null) |
-    select((.ts | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) >= $cutoff)] |
+    select((.ts | sub("\\.[0-9]+Z$";"Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) >= $cutoff)] |
     if length == 0 then empty
-    else max_by(.ts | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) | .session_id
+    else max_by(.ts | sub("\\.[0-9]+Z$";"Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) | .session_id
     end' \
   "$REGISTRY" 2>/dev/null | tr -d '"')
 
