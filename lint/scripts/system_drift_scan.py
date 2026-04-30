@@ -236,7 +236,7 @@ def scan_launchagents() -> list[Finding]:
     norm = defaultdict(list)
     for stem in stems:
         norm[stem.replace("-", ".").replace(".", "_")].append(stem)
-    for key, group in norm.items():
+    for group in norm.values():
         if len({s for s in group}) > 1 and any("." in s for s in group) and any("-" in s for s in group):
             out.append(Finding("launchagents", "HIGH", "D5", "+".join(group),
                                "dot-vs-dash naming collision — duplicate scheduling risk"))
