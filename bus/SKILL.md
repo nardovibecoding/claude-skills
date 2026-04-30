@@ -153,15 +153,7 @@ Syntax aliases: `@A msg` → `tell A "msg"`; `@all msg` → `all "msg"`.
 
 ### Consensus protocol (mode=consensus)
 
-3 rounds, hard-capped:
-
-1. **Round 1 — Positions** — initiator broadcasts `mode=consensus` with question. Each peer replies `mode=reply` with their position + 1-line reasoning.
-2. **Round 2 — Critique** — each peer broadcasts `mode=consensus` round=2 critiquing the weakest opposing position.
-3. **Round 3 — Vote** — each peer broadcasts a final ≤20-word answer.
-
-Aggregation (initiator only): collect round-3 votes; if ≥75% agree → `/radio all "CONSENSUS: <answer>"`; else `/radio all "NO CONSENSUS. Positions: ..."`.
-
-Termination guarantees: 60s/round timeout; cap 3 rounds; one vote per peer per round; non-initiators stop after round 3.
+3 hard-capped rounds: (R1) positions + 1-line reasoning, (R2) critique weakest opposing position, (R3) final ≤20-word answer. Initiator aggregates R3 votes: ≥75% → `/radio all "CONSENSUS: <answer>"`; else `/radio all "NO CONSENSUS. ..."`. 60s/round timeout; one vote per peer per round; non-initiators stop after R3.
 
 ## Step 6 — Stop verbs
 
