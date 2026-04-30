@@ -1,6 +1,6 @@
 ---
 name: todo
-description: Snapshot current conversation in ≤3 sentences PLUS list every unanswered question from this session. Use when Bernard calls /todo (or legacy /snap). Outputs snapshot + open-questions list — no preamble, no offers, no follow-up.
+description: Snapshot current conversation in ≤3 sentences PLUS list every open loop / dangling digression from this session — points where Bernard asked a clarification, got an answer, then never circled back to a decision. Use when Bernard calls /todo (or legacy /snap). No preamble, no offers, no follow-up.
 user_invocable: true
 ---
 
@@ -9,7 +9,7 @@ user_invocable: true
 When invoked, output two blocks back-to-back:
 
 1. **Snapshot** — context of the current conversation in **at most 3 sentences** (fewer is better).
-2. **Open questions** — every unanswered question raised earlier in this session that Bernard has not addressed.
+2. **Open loops** — every dangling digression: a sub-topic where Bernard asked a clarifying question, got an answer from the assistant, and then pivoted to a new topic without giving a decision / "go" / "do X" / "ok next" on the original point. The original thread is still hanging — Bernard never told the assistant what to do with that information.
 
 Then stop. No preamble, no offers, no follow-up.
 
