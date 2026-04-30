@@ -14,8 +14,6 @@ When invoked, output three blocks back-to-back:
 
 Then stop. No preamble, no offers, no follow-up.
 
-Legacy alias: `/snap` triggers the same skill.
-
 ---
 
 ## Session boundary
