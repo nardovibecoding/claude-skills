@@ -144,8 +144,7 @@ async function main(): Promise<void> {
       // target may be a bus name or numeric sid; resolve_name.sh handles both.
       const recipientSid = resolveNameToSid(target!);
       // appendReply enriches envelope with mode=reply + reply_from.
-      const out = await appendReply(recipientSid, { ...envelope, reply_from: busName });
-      void out;
+      await appendReply(recipientSid, { ...envelope, reply_from: busName });
       process.stdout.write(
         JSON.stringify({ ok: true, msg_id, in_reply_to: replyTo ?? null }) + "\n",
       );
