@@ -87,7 +87,6 @@ function resolveNameToSid(nameOrSid: string): string {
     "..",
     "..",
     "..",
-    "..",
     "scripts",
     "resolve_name.sh",
   );
