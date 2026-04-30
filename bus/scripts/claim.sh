@@ -26,9 +26,9 @@ fi
 
 RAW_PATH="$1"
 
-# LEGAL path check: reject shell metacharacters.
+# LEGAL path check: reject shell metacharacters (;  &  |  $  ` and newline).
 case "$RAW_PATH" in
-  *[\;\&\|\\\$\`\n]*)
+  *[';''&''|''$''`']* | *$'\n'*)
     jq -cn '{ok:false, reason:"illegal_chars_in_path"}'
     exit 1 ;;
 esac
