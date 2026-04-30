@@ -57,9 +57,10 @@ function die(msg: string, code = 2): never {
 function parseArgs(argv: string[]): {
   verb: Verb;
   target?: string;
+  inReplyTo?: string;
   payload: string;
 } {
-  if (argv.length < 2) die("usage: send.ts <verb> [target] <payload>");
+  if (argv.length < 2) die("usage: send.ts <verb> [target] [in_reply_to] <payload>");
   const verb = argv[0] as Verb;
   if (!(verb in VERB_TO_MODE)) die(`unknown verb: ${verb}`);
 
@@ -67,7 +68,12 @@ function parseArgs(argv: string[]): {
     if (argv.length !== 2) die(`${verb} takes exactly 1 arg: <payload>`);
     return { verb, payload: argv[1]! };
   }
-  // tell / ask / reply: <target> <payload>
+  if (verb === "reply") {
+    // reply <target> <in_reply_to_msg_id> <payload>
+    if (argv.length !== 4) die(`reply takes 3 args: <target> <in_reply_to_msg_id> <payload>`);
+    return { verb, target: argv[1]!, inReplyTo: argv[2]!, payload: argv[3]! };
+  }
+  // tell / ask: <target> <payload>
   if (argv.length !== 3) die(`${verb} takes 2 args: <target> <payload>`);
   return { verb, target: argv[1]!, payload: argv[2]! };
 }
