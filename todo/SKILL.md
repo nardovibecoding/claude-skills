@@ -30,21 +30,41 @@ Legacy alias: `/snap` triggers the same skill.
 - Tense: past for done, present for current state, "next:" prefix for open work.
 - Plain prose. No bullet lists, no headers inside the snapshot. Code identifiers in backticks OK.
 
-## Open questions block
+## Open loops block
 
-Header: `Open:` (single line label, then one bullet per question).
+Header: `Open loops:` (single line label, then one bullet per loop).
 
-Sources to mine, in priority order:
-1. The `⏳ Still open (N unanswered question(s) from earlier)` reminders in UserPromptSubmit hook context.
-2. Any AskUserQuestion calls earlier in this session whose answer was not given.
-3. Any literal questions you (the assistant) asked Bernard in prior turns that he scrolled past or did not address.
+### Detection logic — what counts as an open loop
 
-### Open-questions rules
+Scan back through the entire session, oldest to newest, looking for **digressions Bernard never closed**. The pattern:
 
-- One bullet per open question. Quote ≤15 words. Strip "want me to" / "should I" if shortening helps.
+1. Bernard asked a clarifying question, OR raised a sub-topic, OR said "wait, what about X" / "before that" / "actually" / "also"
+2. The assistant **answered** that clarification with information, options, or a recommendation
+3. Bernard's next message **pivoted to a different topic** (or kept going with no decision verb on the original) — never said "ok do it" / "go" / "skip" / "yes" / "no" / "later" on the assistant's reply
+4. The session moved on; that thread is still hanging
+
+So the loop is: *Bernard asked → assistant answered → Bernard never decided what to do with the answer → topic drifted away*.
+
+Each loop = one decision Bernard owes the original sub-topic. The bullet should remind him **what the answered point was** + **what decision is still owed**.
+
+### Sources to mine, in priority order
+
+1. The `⏳ Still open (N unanswered question(s) from earlier)` reminders in UserPromptSubmit hook context — but these are usually assistant→Bernard questions; treat as one source, not the only one.
+2. **Bernard→assistant clarifications** earlier in session where the assistant's answer offered options / facts / a recommendation, and Bernard's next message pivoted instead of deciding.
+3. Any AskUserQuestion calls whose answer was not given.
+4. Any literal questions the assistant asked Bernard in prior turns that he scrolled past.
+
+### Open-loops rules
+
+- One bullet per loop. Format: `<short topic> — <decision owed>`. ≤20 words.
+  - Good: `jcode source patch — decided to file issue instead; build-from-source still pending if upstream silent`
+  - Good: `VPN exit choice — Japan vs residential SOCKS5; no decision after researching`
+  - Bad (too vague): `jcode stuff`
+  - Bad (just the question): `should we patch jcode?`
 - Newest first. Cap at 6 bullets — if more, list 6 most recent and append `+N older` on a final line.
-- If zero open questions, write `Open: none.` on a single line and stop.
-- No commentary. Do not answer the questions, do not pick one, do not ask which to address.
+- Skip loops Bernard explicitly closed later ("skip", "later", "doesn't matter", "drop it").
+- If zero open loops, write `Open loops: none.` on a single line and stop.
+- No commentary. Do not answer / decide / pick / ask which to address.
 
 ## Output template
 
