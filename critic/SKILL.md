@@ -1,8 +1,9 @@
 ---
 name: critic
-description: Adversarial red team — find security holes, logic bugs, wasted resources. Triggers: "critic", "red team", "attack this", "what's wrong", "find flaw...
-user-invocable: true
+description: Retired 2026-04-30. Use /debug critic <target> instead. Body archived at SKILL.md.disabled.retired.
+user-invocable: false
 ---
-<critic>
-Call the skill-loader MCP tool `load_skill` with name "critic" to get full instructions, then follow them.
-</critic>
+
+# critic — retired
+
+This skill was absorbed into the unified `/debug` skill on 2026-04-30. Use `/debug critic <target>` (see `~/.claude/skills/debug/SKILL.md`).
