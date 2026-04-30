@@ -2,7 +2,7 @@
 name: upskill
 description: |
   On-demand upskill scout — lens-driven 7-step sweep that resolves a lens (default `skills`), scouts external candidates via `gh search`, scores by intrinsic ROI, overlays bigd-context (perf / gaps / skills audit), prompts adopt gate for ADOPT-EXT top-1, and either (a) invokes the extract subroutine after explicit `Y` confirm or (b) prints a `/ship continue upskill-<slug>` handoff for FIX-* / TRIM-SKILL / CLEAN-HOUSE categories.
-  Triggers: "/upskill", "/upskill <lens>", "/upskill menu:<file>", "what should I improve", "find improvements", "scout new tools".
+  Triggers: "/upskill", "/upskill <lens>", "/upskill menu:<file>", "/upskill health", "/upskill audit <path-or-url>", "what should I improve", "find improvements", "scout new tools", "skill health", "check skills", "audit skill safety", "scan skill before install".
   Iron Law: NO auto-adopt — Phase 6 adopt gate requires explicit `Y`. CONFIRM_BYPASS env / `--auto` flag FORBIDDEN.
   NOT FOR: external web research without gap-context (use /r1a). NOT FOR: installing the candidate without /upskill context (use /extractskill standalone with `--standalone-url`). NOT FOR: lessons promotion (use /lint). NOT FOR: inbox panel (use /daemons). NOT FOR: bug diagnosis (use /debug).
   Produces: top-5 ranked candidate list (5-category IA: FIX-DRIFT / FIX-PERF / ADOPT-EXT / TRIM-SKILL / CLEAN-HOUSE) + auto-emitted top-1 SPEC + adopt-gate decision + extract result OR fallback handoff line.
