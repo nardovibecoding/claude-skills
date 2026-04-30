@@ -13,7 +13,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { type BusEnvelope, BUS_MODES, REQUIRED_KEYS } from "./types.js";
+import { type BusEnvelope, BUS_MODES, REQUIRED_KEYS, CONSENSUS_KINDS, CONSENSUS_REQUIRED_KEYS } from "./types.js";
 
 if (typeof (globalThis as { Bun?: unknown }).Bun === "undefined") {
   throw new Error("Bun runtime required, current = node");
