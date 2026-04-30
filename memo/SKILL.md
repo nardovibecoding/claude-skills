@@ -19,7 +19,22 @@ Inspect `$ARG` (the verb argument after `/memo`):
 - starts with `#` → **tag-filter mode** (S2)
 - equals `search` or starts with `search ` → **search mode** (S3 — full-text body substring)
 - equals `--since` or starts with `--since ` → **diff mode** (S7 — NEW vs RECURRING vs RESOLVED, default window 7d)
+- equals `--source notebooklm` or starts with `--source notebooklm ` → **notebooklm mode** (S8 — browser-automation query into a NotebookLM notebook; folded 2026-04-30)
+- starts with `https://notebooklm.google.com/` → **notebooklm URL mode** (auto-route to S8 with `--manage add` to register the URL, then prompt for a query)
 - anything else → **scribble mode** (S4 — write a terminal memo, parse #tag tokens out of body)
+
+### S8 — NotebookLM source dispatch (folded 2026-04-30, skill-consolidation step 20)
+
+```bash
+# Query a notebook
+python3 ~/.claude/skills/notebooklm/scripts/run.py ask_question.py --question "<q>"
+
+# Library management
+python3 ~/.claude/skills/notebooklm/scripts/run.py notebook_manager.py --add <url>
+python3 ~/.claude/skills/notebooklm/scripts/run.py notebook_manager.py --list
+```
+
+Backend preserved at `~/.claude/skills/notebooklm/scripts/` (run.py, ask_question.py, notebook_manager.py). Persistent auth dir + browser session lifecycle unchanged. Only the dispatcher slash retired — the original `/notebooklm` skill SKILL.md was deleted.
 
 ## Steps
 
