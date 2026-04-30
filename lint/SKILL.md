@@ -14,14 +14,16 @@ Run unified maintenance via lazy-loaded phase files. SKILL.md is the dispatcher 
 
 | flag | phases run | reads |
 |---|---|---|
-| `/lint` (no flag) | 1 + 1.5 + 2 + 3 + 4 + 5 + 6 + 7 + capacity | all 8 phase files |
+| `/lint` (no flag) | 1 + 1.5 + 2 + 3 + 4 + 5 + 6 + 7 + 9 + capacity | all 9 phase files |
 | `/lint --quick` | 1 + 4 + capacity | `phase-1-scan.md`, `phase-4-stale.md` |
 | `/lint --code` | 7 only | `phase-7-code.md` |
-| `/lint --fix` | 1 with `--fix` + 1.5 + index rebuild + graph sync | `phase-1-scan.md`, `phase-1.5-dedup.md` |
+| `/lint --fix` | 1 with `--fix` + 1.5 + 9 with `--fix` + index rebuild + graph sync | `phase-1-scan.md`, `phase-1.5-dedup.md`, `phase-9-data.md` |
 | `/lint --memory` | 3 + 4 + 5 | `phase-3-mining.md`, `phase-4-stale.md`, `phase-5-promote.md` |
 | `/lint --skills` | 6 only | `phase-6-skills.md` |
 | `/lint --claudemd` | 5b + 8 | `phase-5-promote.md`, `phase-8-claudemd.md` |
-| `/lint --unattended` | 1 + 1.5 + 2 + 3 + 4 + 5a + 5b (Phase 6 + 7 skipped) | `unattended.md` (which references each phase file) |
+| `/lint --data` | 9 only | `phase-9-data.md` |
+| `/lint --bot-data` | 9 only (synonym for `--data`) | `phase-9-data.md` |
+| `/lint --unattended` | 1 + 1.5 + 2 + 3 + 4 + 5a + 5b + 9 (Phase 6 + 7 skipped) | `unattended.md` (which references each phase file) |
 
 Always run **Capacity monitoring** at end (table below — small enough to keep inline).
 
