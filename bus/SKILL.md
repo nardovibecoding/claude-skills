@@ -151,25 +151,20 @@ Syntax aliases: `@A msg` → `tell A "msg"`; `@all msg` → `all "msg"`.
 `/radio stop` (also `off`/`leave`/`quit`/`stop bus`/`stop radio`):
 
 ```bash
-# Broadcast leave notice
-BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts all "$NAME leaving"
+# 1. Broadcast leave notice (best-effort; ignore failure if writer down)
+BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts all "$NAME leaving" 2>/dev/null || true
 
-# SIGTERM the plugin tails (sentinel removal alone won't stop them — per OI-S3-2).
-PLUGIN_PID_FILE=~/.claude/bus/plugin-pid/$SID
-if [ -f "$PLUGIN_PID_FILE" ]; then
-  kill -TERM "$(cat $PLUGIN_PID_FILE)" 2>/dev/null
-  rm -f "$PLUGIN_PID_FILE"
-else
-  pkill -TERM -f "plugin:bus@local.*$SID" 2>/dev/null
-fi
+# 2. Atomic teardown: SIGTERM plugin + remove sentinel + drop registry entries.
+RESP=$(bash ~/.claude/skills/bus/scripts/leave.sh)
+echo "$RESP" | jq -e '.ok == true' >/dev/null || echo "[radio] leave warning: $RESP" >&2
 
-# Remove sentinel + heartbeat
-rm -f ~/.claude/bus/opted-in/$SID
-# Heartbeat process is the bash backgrounded in Step 4 — TaskStop its task_id
-# (recorded when started), or it auto-exits when sentinel disappears next loop.
+# 3. Heartbeat process is the bash backgrounded in Step 4 — TaskStop its task_id
+#    (recorded when started), or it auto-exits when sentinel disappears next loop.
 
-echo "Radio stopped. Plugin tails killed; sentinel removed; registry entry expires in 60s."
+echo "Radio stopped. Plugin tails killed; sentinel removed; registry entries dropped."
 ```
+
+`leave.sh` does, inside the same `mkdir`-lock critical section as `join.sh`: read `plugin-pid/<sid>` and SIGTERM if present (fallback to `pkill -f "plugin:bus@local.*<sid>"` covered by main.ts shutdown handler) → `rm` sentinel → filter `registry.jsonl` to drop all entries with this `session_id`.
 
 ## Plugin lifecycle
 
