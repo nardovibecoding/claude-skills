@@ -127,21 +127,30 @@ def detect_schema_drift(line: str) -> Optional[str]:
 
 
 def _list_dir(host: Dict, dir_path: str) -> List[Tuple[str, int, int]]:
-    """Return [(filename, size_bytes, mtime_epoch)] for files in dir_path."""
-    cmd = f"find '{dir_path}' -maxdepth 1 -type f -printf '%f\\t%s\\t%T@\\n' 2>/dev/null"
+    """Return [(filename, size_bytes, mtime_epoch)] for files in dir_path.
+
+    Portable across BSD (mac) + GNU (linux) — uses ls + stat fallback per file.
+    """
     if host["ssh"]:
-        rc, out, err = _ssh(host["ssh"], cmd)
+        # Linux: GNU find -printf works
+        cmd = f"find {dir_path} -maxdepth 1 -type f -printf '%f\\t%s\\t%T@\\n' 2>/dev/null"
+        rc, out, _ = _ssh(host["ssh"], cmd)
     else:
-        rc, out, err = _run(["bash", "-c", cmd])
-    if rc != 0:
-        return []
+        # macOS: BSD find lacks -printf — use stat -f
+        cmd = (f"cd '{dir_path}' 2>/dev/null && "
+               f"find . -maxdepth 1 -type f 2>/dev/null | "
+               f"while read f; do "
+               f"  stat -f '%N\\t%z\\t%m' \"$f\" 2>/dev/null || stat -c '%n\\t%s\\t%Y' \"$f\" 2>/dev/null; "
+               f"done")
+        rc, out, _ = _run(["bash", "-c", cmd])
     rows = []
     for line in out.splitlines():
         parts = line.split("\t")
         if len(parts) != 3:
             continue
+        fname = parts[0].lstrip("./")
         try:
-            rows.append((parts[0], int(parts[1]), int(float(parts[2]))))
+            rows.append((fname, int(parts[1]), int(float(parts[2]))))
         except ValueError:
             continue
     return rows
