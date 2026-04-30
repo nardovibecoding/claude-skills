@@ -108,7 +108,7 @@ _cast_vote() {
   # Write vote envelope directly to initiator's inbox using appendTargeted.
   BUS_FORCE_SID="$peer_sid" \
   BUS_NAME="$peer_name" \
-  bun run --eval "
+  bun --eval "
 import { appendTargeted } from '$WRITER';
 await appendTargeted('${INITIATOR_SID}', {
   msg_id: '${msg_id}',
