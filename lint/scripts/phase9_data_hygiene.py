@@ -234,17 +234,10 @@ def _ssot_size_and_archives(host: Dict) -> Optional[Dict]:
     dir_path = str(Path(host["ssot_dir"]).expanduser()) if not host["ssh"] else host["ssot_dir"]
     rows = _list_dir(host, dir_path)
     if not rows and host["ssh"]:
-        # remote dir may not exist
-        return None
-    if rc != 0:
         return None
     cur_size = 0
     archives = []
-    for line in out.splitlines():
-        parts = line.split("\t")
-        if len(parts) != 3:
-            continue
-        fname, size, mtime = parts[0], int(parts[1]), int(float(parts[2]))
+    for fname, size, mtime in rows:
         if fname == "ssot.jsonl":
             cur_size = size
         elif re.match(r"^ssot\.\d{8}-\d{6}\.jsonl\.gz$", fname):
