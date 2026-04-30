@@ -55,6 +55,17 @@ function log(action: string, kvs: Record<string, string | number> = {}): void {
 const sessionId = resolveSessionId();
 log("plugin attached", { session_id: sessionId });
 
+// OI-S4-1: write own pid keyed by sessionId so /radio stop can SIGTERM us.
+import { mkdirSync, writeFileSync, unlinkSync as _unlinkPidSync } from "node:fs";
+const PLUGIN_PID_FILE = path.join(PLUGIN_PID_DIR, sessionId);
+try {
+  mkdirSync(PLUGIN_PID_DIR, { recursive: true });
+  writeFileSync(PLUGIN_PID_FILE, String(process.pid) + "\n");
+  log("pid file written", { path: PLUGIN_PID_FILE, pid: process.pid });
+} catch (e) {
+  log("pid file write failed", { err: String((e as Error).message) });
+}
+
 try {
   const swept = cleanStaleSentinels();
   if (swept > 0) log("startup sweep", { stale_cleaned: swept });
