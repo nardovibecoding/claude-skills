@@ -1,0 +1,126 @@
+# /github audit — five-phase audit workflow
+
+Five phases. Report issues grouped by severity, fix on confirm.
+
+Flags (forwarded from dispatcher):
+- `audit` — full audit, confirm before any changes
+- `audit --fix` — full audit + auto-fix all safe issues
+- `audit --report` — dry run, no changes
+- `audit --phase N` — run a single phase only
+
+---
+
+## Phase 1: Metadata audit
+
+```bash
+gh repo list nardovibecoding --limit 50 --json name,description,repositoryTopics,homepageUrl,licenseInfo,visibility
+```
+
+Flag each repo for:
+- **Description** blank or under 20 chars
+- **Topics** empty (suggest based on name: `simply-*` → suggest `claude-code`, `ai-agent`; `claudecode-*` → same plus flag for retrofit to `simply-*`; `telegram*` → `telegram-bot`; `llm*` → `llm`)
+- **Homepage** blank (flag only for repos with "demo", "app", "extension", "bridge" in name)
+- **License** missing (flag for all public repos)
+
+Print as table: `repo | description | topics | homepage | license | issues`
+
+---
+
+## Phase 2: Local clone health
+
+Find all local git repos:
+```bash
+find ~ -maxdepth 3 -name ".git" -type d 2>/dev/null | grep -v node_modules
+```
+
+For each repo found, get its remote URL:
+```bash
+git -C <repo_dir> remote get-url origin 2>/dev/null
+```
+
+Extract repo name from URL, check if it still exists in the GitHub repo list from Phase 1.
+
+Flag: local clone pointing to a GitHub repo name that no longer exists (renamed or deleted).
+
+Also flag: remote URL containing embedded credentials (pattern: `https://username:TOKEN@github.com`). These are a security risk — anyone who reads git config gets GitHub access.
+
+Fix (with confirm):
+- Drift: `git -C <repo_dir> remote set-url origin https://github.com/nardovibecoding/<new_name>.git`
+- PAT in URL: strip to clean URL `git -C <repo_dir> remote set-url origin https://github.com/nardovibecoding/<repo>.git`
+- After stripping PAT: remind user to revoke the token at github.com/settings/tokens
+
+---
+
+## Phase 3: Stale reference scan
+
+Get all current GitHub repo names from Phase 1. Also collect known old names by diffing against any name found in local files that doesn't match current names.
+
+Scan these paths for stale repo name strings:
+- `~/.claude/skills/*/SKILL.md`
+- `~/.claude/CLAUDE.md`
+- `~/.claude/projects/-Users-bernard/memory/MEMORY.md`
+- `~/llm-wiki-stack/**/*.md` (READMEs, scaffolds, config comments)
+- `~/NardoWorld/` — SKIP (historical records, correct at time of writing)
+
+For each match: show file path, line number, old name, suggested replacement.
+
+Fix (with confirm): update refs in place, then commit + push if the file is inside a git repo.
+
+---
+
+## Phase 4: Report + fix
+
+After Phases 1-3, print a grouped summary:
+
+```
+METADATA ISSUES (N)
+  → repo: missing description
+  → repo: no topics
+
+CLONE DRIFT (N)
+  → ~/path/repo: remote points to old-name, current is new-name
+
+STALE REFS (N)
+  → ~/.claude/skills/foo/SKILL.md:12 — "old-name" → "new-name"
+```
+
+If `--report`: stop here.
+If `--fix`: apply all fixes automatically.
+Otherwise: ask "Fix all N issues? (y/n)" — if yes, apply fixes, commit+push changed files.
+
+For metadata fixes use `gh repo edit`:
+```bash
+gh repo edit nardovibecoding/<repo> --description "..." --add-topic <topic>
+```
+
+---
+
+## Phase 5: Cross-repo consistency
+
+Check naming and description conventions across repo families:
+
+**`simply-*` repos** should all have:
+- Description starting with `Claude Code plugin —` or `Claude Code skill —`
+- Topics including `claude-code`
+
+**`claude-*` repos** (non-plugin, pre-`simply-*` brand) should have:
+- Topics including `claude-code` or `llm`
+- Flag for retrofit to `simply-*` per github-publish naming canon
+
+**`llm-*` / `memory-*` repos** should have:
+- Topics including `llm`, `knowledge-base`, or `personal-wiki`
+
+**`telegram-*` / `*-telegram-*`** should have:
+- Topics including `telegram-bot`
+
+Flag any repo in a family that drifts from the pattern. Show suggested description/topic fix. Apply with confirm.
+
+Print consistency score: `N/M repos follow conventions`.
+
+---
+
+## Output style
+- Use tables for Phase 1 metadata
+- Use file:line format for Phase 3 refs
+- Group by severity: ERROR (blank description, broken clone URL) > WARN (missing topics, license) > INFO (consistency drift)
+- Always show total issue count before asking to fix
