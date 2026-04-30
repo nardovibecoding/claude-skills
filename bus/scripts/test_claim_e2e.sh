@@ -72,7 +72,9 @@ pass "Session B correctly blocked with already_claimed"
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== Step 3: Hook radio_claim_guard.py blocks Write for session B ==="
-HOOK_INPUT=$(jq -cn --arg p "$CANARY" '{"tool_name":"Write","tool_input":{"file_path":$p}}')
+# Use resolved canonical path (macOS /tmp -> /private/tmp symlink).
+CANARY_REAL=$(realpath "$CANARY")
+HOOK_INPUT=$(jq -cn --arg p "$CANARY_REAL" '{"tool_name":"Write","tool_input":{"file_path":$p}}')
 echo "Hook input: $HOOK_INPUT"
 
 HOOK_OUT=$(printf '%s' "$HOOK_INPUT" | \
