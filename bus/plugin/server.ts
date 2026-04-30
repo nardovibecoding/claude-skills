@@ -1,16 +1,26 @@
 #!/usr/bin/env bun
 /**
- * /bus v2 channel plugin — MCP server skeleton (S2).
+ * /bus v2 channel plugin — MCP server (S3 = wire push pipeline).
  *
- * Connects via stdio as channel `plugin:bus@local`, registers the channel
- * capability, and exposes a no-op `pushEvent` placeholder. S3 will wire the
- * spool tail (~/.claude/bus/inbox/<session_id>.jsonl) and actual notification
- * delivery via `notifications/claude/channel`.
+ * Connects via stdio as channel `plugin:bus@local`. On startup:
+ *   - resolve session_id from parent-process walk (claude PID)
+ *   - sweep stale opt-in sentinels (best-effort)
+ *   - check sentinel for THIS session_id:
+ *       absent → log "not opted in, idle"; do not tail anything (zero CPU)
+ *       present → tail BOTH ~/.claude/bus/all.jsonl (broadcast) and
+ *                 ~/.claude/bus/inbox/<session_id>.jsonl (targeted)
+ *   - for each emitted line: parse envelope, skip own messages (own
+ *     from_session_id), skip duplicates (msg_id LRU dedupe), push to Claude
+ *     via mcp.notification({ method: 'notifications/claude/channel', ... }).
  *
  * Reference: anthropics/claude-plugins-official external_plugins/fakechat
- * (commit @main as of 2026-04-30): server name is plain string, capabilities
- * are { tools: {}, experimental: { 'claude/channel': {} } }, transport is
- * StdioServerTransport. We mirror that shape.
+ * (server.ts:136-145) + telegram (server.ts:404-425). SDK signature:
+ * Server.notification(notification, options?): Promise<void>
+ * (node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.d.ts:383).
+ *
+ * Re-check sentinel? NO. Opt-in is one-way; sentinel checked at startup only.
+ * /bus join after plugin started in idle mode = restart claude session
+ * required (documented as OI-S3-1).
  *
  * Diagnostic output: stderr ONLY. stdout is the JSON-RPC channel.
  */
@@ -21,12 +31,20 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import path from "node:path";
+import os from "node:os";
 import { resolveSessionId } from "./src/session.js";
 import { isOptedIn, cleanStaleSentinels } from "./src/sentinel.js";
-import type { BusEnvelope } from "./src/types.js";
+import { tailSpool, type SpoolHandle } from "./src/spool.js";
+import { SeenSet } from "./src/dedupe.js";
+import { type BusEnvelope, BUS_MODES, REQUIRED_KEYS } from "./src/types.js";
 
 const SERVER_NAME = "plugin:bus@local";
 const SERVER_VERSION = "0.1.0";
+
+const BUS_ROOT = path.join(os.homedir(), ".claude", "bus");
+const BROADCAST_PATH = path.join(BUS_ROOT, "all.jsonl");
+const INBOX_DIR = path.join(BUS_ROOT, "inbox");
 
 function log(action: string, kvs: Record<string, string | number> = {}): void {
   const parts = Object.entries(kvs).map(([k, v]) => `${k}=${v}`);
@@ -36,7 +54,6 @@ function log(action: string, kvs: Record<string, string | number> = {}): void {
 const sessionId = resolveSessionId();
 log("plugin attached", { session_id: sessionId });
 
-// Best-effort sweep on startup — costs <5ms, prevents cruft accumulation.
 try {
   const swept = cleanStaleSentinels();
   if (swept > 0) log("startup sweep", { stale_cleaned: swept });
@@ -44,12 +61,8 @@ try {
   log("startup sweep failed", { err: String((e as Error).message) });
 }
 
-// S3 will replace this body. For now: pure no-op so the symbol exists and
-// downstream wiring (spool tail) has its push target. Exported for testing
-// and so S3's diff is one-file.
-export function pushEvent(_envelope: BusEnvelope): void {
-  // intentionally empty in S2
-}
+const seen = new SeenSet(1000);
+const tails: SpoolHandle[] = [];
 
 const mcp = new Server(
   { name: SERVER_NAME, version: SERVER_VERSION },
@@ -60,9 +73,75 @@ const mcp = new Server(
   },
 );
 
-// Minimal tool surface for S2. /bus skill itself owns the user-facing verbs;
-// the MCP layer just needs to be a valid server. S3 may add tools if needed
-// for delivery; for now we expose a status probe.
+function parseEnvelope(line: string): BusEnvelope | null {
+  let env: unknown;
+  try {
+    env = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  if (env === null || typeof env !== "object") return null;
+  const e = env as Record<string, unknown>;
+  for (const k of REQUIRED_KEYS) {
+    if (typeof e[k] !== "string" || (e[k] as string).length === 0) return null;
+  }
+  if (!BUS_MODES.has(e.mode as BusEnvelope["mode"])) return null;
+  return e as unknown as BusEnvelope;
+}
+
+export function pushEvent(envelope: BusEnvelope): void {
+  if (envelope.from_session_id === sessionId) return; // never push own writes
+  if (seen.has(envelope.msg_id)) return;
+  seen.add(envelope.msg_id);
+  const meta: Record<string, string> = {
+    chat_id: "bus",
+    message_id: envelope.msg_id,
+    user: envelope.from,
+    user_id: envelope.from_session_id,
+    ts: envelope.ts,
+    mode: envelope.mode,
+    to: envelope.to,
+  };
+  if (envelope.in_reply_to) meta.in_reply_to = envelope.in_reply_to;
+  if (envelope.reply_from) meta.reply_from = envelope.reply_from;
+  void mcp
+    .notification({
+      method: "notifications/claude/channel",
+      params: { content: envelope.payload, meta },
+    })
+    .catch((e: Error) => {
+      log("push failed", { msg_id: envelope.msg_id, err: e.message });
+    });
+  log("push", {
+    msg_id: envelope.msg_id,
+    from: envelope.from,
+    to: envelope.to,
+    mode: envelope.mode,
+  });
+}
+
+function onLine(source: string, line: string): void {
+  const env = parseEnvelope(line);
+  if (!env) {
+    log("malformed envelope", { source, head: line.slice(0, 40) });
+    return;
+  }
+  pushEvent(env);
+}
+
+function startTails(): void {
+  const inboxPath = path.join(INBOX_DIR, `${sessionId}.jsonl`);
+  tails.push(tailSpool(BROADCAST_PATH, (l) => onLine("all", l)));
+  tails.push(tailSpool(inboxPath, (l) => onLine("inbox", l)));
+  log("tails started", { broadcast: BROADCAST_PATH, inbox: inboxPath });
+}
+
+if (isOptedIn(sessionId)) {
+  startTails();
+} else {
+  log("not opted in, idle", { session_id: sessionId });
+}
+
 mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
@@ -79,6 +158,8 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       session_id: sessionId,
       opted_in: isOptedIn(sessionId),
       version: SERVER_VERSION,
+      tails_active: tails.length,
+      seen_size: seen.size,
     };
     return { content: [{ type: "text", text: JSON.stringify(status) }] };
   }
@@ -88,10 +169,11 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   };
 });
 
-// Graceful shutdown. MCP transport's close() flushes any pending frames.
 function shutdown(sig: string): void {
   log("shutdown", { signal: sig });
-  // Server.close() is async but we exit synchronously — best-effort.
+  for (const t of tails) {
+    try { t.stop(); } catch { /* ignore */ }
+  }
   void mcp.close().finally(() => process.exit(0));
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
