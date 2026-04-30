@@ -10,6 +10,14 @@ export const BUS_MODES: ReadonlySet<BusMode> = new Set([
   "reply",
 ]);
 
+// Consensus sub-type: question (initiator → all), vote (peer → initiator), verdict (initiator → all).
+export type ConsensusKind = "question" | "vote" | "verdict";
+export const CONSENSUS_KINDS: ReadonlySet<ConsensusKind> = new Set([
+  "question",
+  "vote",
+  "verdict",
+]);
+
 export interface BusEnvelope {
   msg_id: string;            // ulid or `${sessionId}-${counter}`; caller-generated
   from: string;              // sender bus name (e.g. "A") or session_id
@@ -20,6 +28,10 @@ export interface BusEnvelope {
   payload: string;           // raw text body
   in_reply_to?: string;      // msg_id of original (replies)
   reply_from?: string;       // sender of reply (mode=reply)
+  // Consensus fields — required when mode=consensus; forbidden otherwise.
+  round?: number;            // 1, 2, or 3 — which consensus round this belongs to
+  kind?: ConsensusKind;      // sub-type: "question" | "vote" | "verdict"
+  consensus_id?: string;     // groups all envelopes for one run; format: "<sid>-c-<epoch>"
 }
 
 export const REQUIRED_KEYS: ReadonlyArray<keyof BusEnvelope> = [
@@ -30,4 +42,11 @@ export const REQUIRED_KEYS: ReadonlyArray<keyof BusEnvelope> = [
   "mode",
   "ts",
   "payload",
+];
+
+// Fields required on every mode=consensus envelope.
+export const CONSENSUS_REQUIRED_KEYS: ReadonlyArray<"round" | "kind" | "consensus_id"> = [
+  "round",
+  "kind",
+  "consensus_id",
 ];
