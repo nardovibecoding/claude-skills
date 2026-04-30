@@ -43,7 +43,7 @@ fi
 NOW=$(date +%s)
 CUTOFF=$((NOW - 60))
 
-SID=$(jq -r --arg n "$ARG" --argjson cutoff "$CUTOFF" \
+SID=$(jq -sr --arg n "$ARG" --argjson cutoff "$CUTOFF" \
   '[.[] | select(.name == $n) | select(.ts != null) |
     select((.ts | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) >= $cutoff)] |
     if length == 0 then empty
