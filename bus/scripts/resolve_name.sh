@@ -43,11 +43,14 @@ fi
 NOW=$(date +%s)
 CUTOFF=$((NOW - 60))
 
+# ts field may be epoch integer (join.sh) or ISO string (heartbeat).
+# Normalize to epoch for comparison in both cases.
 SID=$(jq -sr --arg n "$ARG" --argjson cutoff "$CUTOFF" \
-  '[.[] | select(.name == $n) | select(.ts != null) |
-    select((.ts | sub("\\.[0-9]+Z$";"Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) >= $cutoff)] |
+  'def epoch: if type == "number" then . else (sub("\\.[0-9]+Z$";"Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) end;
+   [.[] | select(.name == $n) | select(.ts != null) |
+    select((.ts | epoch) >= $cutoff)] |
     if length == 0 then empty
-    else max_by(.ts | sub("\\.[0-9]+Z$";"Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) | .session_id
+    else max_by(.ts | epoch) | .session_id
     end' \
   "$REGISTRY" 2>/dev/null | tr -d '"')
 
