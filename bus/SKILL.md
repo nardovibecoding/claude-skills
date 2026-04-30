@@ -132,33 +132,24 @@ Background `while true` loop, sleep 30s. Each tick: re-append registry entry (`{
 
 ## Step 5 — Send verbs (single shared writer)
 
-Every send goes through `plugin/src/cli/send.ts`, which calls `writer.ts` (`appendBroadcast`/`appendTargeted`/`appendReply`). The skill bash NEVER writes JSON to spool files directly — Sh1 single-source enforcement.
+Every send goes through `plugin/src/cli/send.ts` → `writer.ts` (`appendBroadcast`/`appendTargeted`/`appendReply`). The skill bash NEVER writes JSON to spool files directly — Sh1 single-source enforcement.
+
+For `tell`/`ask` first resolve `<name>` → `session_id` via registry (latest entry within 60s), then:
 
 ```bash
-# /radio tell <name> "msg"
-TARGET_NAME=$1; PAYLOAD=$2
-TARGET_SID=$(jq -s --arg n "$TARGET_NAME" \
-  'group_by(.name) | map(max_by(.ts)) |
-   map(select(.name == $n and .ts >= (now - 60))) | .[0].session_id' \
+# tell / ask: resolve target sid, then invoke
+TARGET_SID=$(jq -s --arg n "$TARGET_NAME" 'group_by(.name) | map(max_by(.ts)) |
+  map(select(.name == $n and .ts >= (now - 60))) | .[0].session_id' \
   ~/.claude/bus/registry.jsonl 2>/dev/null | tr -d '"')
-[ -z "$TARGET_SID" ] || [ "$TARGET_SID" = "null" ] && {
-  echo "[radio] no peer named $TARGET_NAME within 60s window"; exit 1;
-}
+[ -z "$TARGET_SID" ] || [ "$TARGET_SID" = "null" ] && { echo "[radio] no peer $TARGET_NAME within 60s"; exit 1; }
 BUS_NAME=$NAME BUS_TARGET_SID=$TARGET_SID \
-  bun run ~/.claude/skills/bus/plugin/src/cli/send.ts tell "$TARGET_NAME" "$PAYLOAD"
+  bun run ~/.claude/skills/bus/plugin/src/cli/send.ts <verb> "$TARGET_NAME" "$PAYLOAD"
 
-# /radio ask <name> "msg" — same as tell, verb=ask
-BUS_NAME=$NAME BUS_TARGET_SID=$TARGET_SID \
-  bun run ~/.claude/skills/bus/plugin/src/cli/send.ts ask "$TARGET_NAME" "$PAYLOAD"
-
-# /radio all "msg"
-BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts all "$PAYLOAD"
-
-# /radio consensus <q>
-BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts consensus "$Q"
-
-# @A msg / @all msg → route to tell / all (parse @ prefix)
+# all / consensus: no target resolution
+BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts <verb> "$PAYLOAD"
 ```
+
+Syntax aliases: `@A msg` → `tell A "msg"`; `@all msg` → `all "msg"`.
 
 ### Consensus protocol (mode=consensus)
 
