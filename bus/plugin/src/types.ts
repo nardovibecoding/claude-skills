@@ -29,7 +29,7 @@ export interface BusEnvelope {
   in_reply_to?: string;      // msg_id of original (replies)
   reply_from?: string;       // sender of reply (mode=reply)
   // Consensus fields — required when mode=consensus; forbidden otherwise.
-  round?: number;            // 1, 2, or 3 — which consensus round this belongs to
+  round?: number;            // 1, 2, or 3 for question/vote; 0 for kind=verdict
   kind?: ConsensusKind;      // sub-type: "question" | "vote" | "verdict"
   consensus_id?: string;     // groups all envelopes for one run; format: "<sid>-c-<epoch>"
 }
