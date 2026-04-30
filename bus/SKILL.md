@@ -1,215 +1,250 @@
 ---
 name: bus
-description: Inter-session message bus.
+description: "Cross-session message bus on Channels MCP push. Sessions opt-in via /radio join (writes sentinel), broadcast via /radio all, target via /radio tell <name>, ask-and-wait via /radio ask <name>. Auto-name A→Z, 60s liveness, 3-round consensus mode (75%/60s/cap). Mode envelope (notify|ask|consensus|reply) controls whether recipient model responds or silently acks. Triggers: /radio (primary), /bus (legacy alias). Channels: plugin:bus@local must be loaded (--channels flag in claude alias)."
 user_invocable: true
 ---
 
-# Session Bus
+# /radio (internal: bus) — cross-session message bus v2
 
-Connects multiple Claude Code sessions via shared files. Sessions auto-discover each other.
+## What it does
 
-## Files
-- Registry: `/tmp/claude_bus_registry.jsonl` — who's online
-- Bus: `/tmp/claude_bus.jsonl` — message queue
+Lets multiple Claude Code sessions on this machine talk. One session opts in (`/radio join`), the plugin (`plugin:bus@local`) tails a shared spool and pushes new messages into the session as channel events. No polling, no monitor tasks, no /tmp registry — replaces v1 entirely.
 
-## Step 1: Assign name
+## Verbs
 
-Names are always UPPERCASE (A, B, C). User input like `@a` is normalized to `@A` before writing to bus. Monitor matches on uppercase.
+| verb | mode | what it does | example |
+| --- | --- | --- | --- |
+| `/radio join` | — | write sentinel; pick name A→Z; start heartbeat | `/radio join` |
+| `/radio stop` (also `off`/`leave`/`quit`) | — | SIGTERM plugin tails; remove sentinel; broadcast leave | `/radio stop` |
+| `/radio tell <name> "msg"` | notify | targeted message; recipient acks ≤1 line | `/radio tell B "fyi"` |
+| `/radio ask <name> "msg"` | ask | recipient responds fully; reply auto-relayed back | `/radio ask B "status?"` |
+| `/radio all "msg"` | notify | broadcast to every joined peer | `/radio all "shipped X"` |
+| `/radio consensus <q>` | consensus | 3-round vote, 75% threshold, 60s/round | `/radio consensus "pg or mysql?"` |
+| `@A msg` | notify | syntax alias for `/radio tell A "msg"` | `@A heads up` |
+| `@all msg` | notify | syntax alias for `/radio all "msg"` | `@all going AFK` |
 
-If user ran `/bus join <name>`, uppercase it and use.
+## /bus legacy
 
-Otherwise auto-assign next letter (A, B, C, …) based on who's already active:
-```bash
-jq -s 'group_by(.name) | map(max_by(.ts)) | map(select(.ts >= (now - 60))) | map(.name)' /tmp/claude_bus_registry.jsonl
+`/bus <verb>` still works — every verb above accepts `/bus` as a synonym. When the user typed `/bus`, emit one line at the top of the response:
+
 ```
-Pick the first letter (A → Z) not in that list. If A is taken, pick B. If A+B taken, pick C. Etc.
-Fallback if A–Z exhausted: `AA`, `AB`, … (unlikely in practice).
-
-Tell user: "Joined as **<name>**"
-
-## Step 2: Register
-
-Append to `/tmp/claude_bus_registry.jsonl` using `jq` (handles escaping safely):
-```bash
-jq -cn --arg name "<name>" --argjson ts $(date +%s) '{name:$name,ts:$ts}' >> /tmp/claude_bus_registry.jsonl
+→ /radio (legacy /bus alias active)
 ```
 
-Also write marker file so `bus_reminder.py` hook keeps injecting persistent context every UserPromptSubmit:
-```bash
-mkdir -p ~/.cache
-jq -cn --arg name "<name>" --argjson ts $(date +%s) '{name:$name,joined_ts:$ts}' > ~/.cache/claude_bus_active.json
-```
-Without this marker, the session will FORGET it's on the bus after the first turn and stop broadcasting milestones.
+Then run the same handler. Do not deprecate-warn beyond that one line.
 
-## Step 3: Discover peers
+## Mode behavior (model-side rules)
 
-Read `/tmp/claude_bus_registry.jsonl` (may not exist yet — handle gracefully).
-**Dedupe by name: keep only the latest `ts` per name** (registry grows via heartbeats).
-Then filter: `ts >= (now - 60)` AND `name != my_name`.
-One-liner:
-```bash
-jq -s 'group_by(.name) | map(max_by(.ts)) | map(select(.ts >= (now - 60) and .name != "<my_name>"))' /tmp/claude_bus_registry.jsonl
-```
-Show peer list:
-- If peers found: "Active peers: **alpha**, **beta**" 
-- If none: "No peers yet. Run /bus in another session within 60s to connect."
+When a channel push arrives, the meta block carries `mode`. The model running this session reads SKILL.md (this file) and applies the rule for the inbound mode:
 
-## Step 4: Start monitoring
+- **`mode=notify`** — display the message; respond with ≤1 line ack ("noted from B") and **do not take action**. No bash, no tools, no follow-up question. The sender chose `tell`/`all` precisely so the recipient does NOT chain work.
+- **`mode=ask`** — treat as if the user just asked the question. Respond fully. After the response, auto-relay back to sender via `/radio reply` (use `BUS_IN_REPLY_TO=<msg_id>` and target=sender's `from_session_id`).
+- **`mode=consensus`** — follow the 3-round consensus protocol below. One vote per round; hard cap 3; 75% threshold.
+- **`mode=reply`** — display the reply; update context. **Do not chain a counter-reply** unless new information genuinely requires it (anti-loop).
 
-Use the Monitor tool with:
-- `persistent: true`
-- `description`: "bus messages for <name>"
-- `command` (watches messages addressed to me OR to @all):
-```bash
-touch /tmp/claude_bus.jsonl
-tail -f /tmp/claude_bus.jsonl | grep -E --line-buffered "\"to\":\"(<name>|all)\""
-```
+## Anti-loop discipline
 
-Also start a second Monitor for registry (auto-announce new joiners):
-- `persistent: true`
-- `description`: "bus peer joins"
-- `command`:
-```bash
-touch /tmp/claude_bus_registry.jsonl
-tail -f -n 0 /tmp/claude_bus_registry.jsonl | while read line; do
-  name=$(echo "$line" | jq -r '.name')
-  if [ "$name" != "<my_name>" ]; then echo "peer-seen: $name"; fi
-done
-```
-When this Monitor emits `peer-seen: <name>`, check if it's NEW (not already in your known-peers list). If new, announce: "🔔 **<name>** joined." Ignore heartbeats of known peers.
+- Plain acks ("ok", "got it", "thanks") arrive as `mode=notify` — display, never reply.
+- Never reply to your own auto-relayed reply.
+- Sender of a `mode=ask` waits for one `mode=reply`; do not re-ask.
 
-When Monitor fires (a message arrives), parse the JSON line and display:
-```
-📨 [from] → you: <msg>
-```
-Then respond naturally to the message content.
+## Auto-announce reflex (mandatory while joined)
 
-## Step 5: Sending messages
+While the sentinel `~/.claude/bus/opted-in/<sessionId>` exists, broadcast on these events without waiting for the user — silence here makes the bus useless:
 
-When user says:
-- `@<peer> <message>` → direct to that peer
-- `@all <message>` → broadcast to all active peers
-
-Append to `/tmp/claude_bus.jsonl` using `jq` (safe escaping):
-```bash
-jq -cn --arg to "<peer-or-all>" --arg from "<my_name>" --arg msg "<message>" --argjson ts $(date +%s) \
-  '{to:$to,from:$from,msg:$msg,ts:$ts}' >> /tmp/claude_bus.jsonl
-```
-For `@all`, write a single line with `to:"all"` — each peer's Monitor matches `"to":"all"` via the regex in Step 4.
-
-### Auto-announce triggers (MANDATORY while bus active)
-
-While `~/.cache/claude_bus_active.json` exists, the session MUST broadcast to bus on these events — NOT wait for user to prompt:
-
-1. **Milestone shipped** — bg agent returns with SHIPPED verdict, or you directly complete a logical unit of work
-2. **Pivot** — strategy/approach change discovered mid-work
+1. **Milestone shipped** — bg agent returns SHIPPED, or you finish a logical unit
+2. **Pivot** — strategy change discovered mid-work
 3. **Blocker** — stuck on something another session might resolve
-4. **Starting work on shared surface** — touching files/dirs another session's scope also touches (check their scope from their announce)
-5. **Decision made** — user-confirmed judgment that affects both sessions' plans
-6. **About to do destructive op** — before rm/force-push/migration that could collide
+4. **Shared-surface touch** — about to edit files another session also touches
+5. **Decision made** — user-confirmed judgment that affects another session's plan
+6. **About to do destructive op** — before rm/force-push/migration
 
-Format: `{to:"all", from:"<name>", msg:"<1-line>", kind:"<milestone|pivot|blocker|scope|decision|warn>"}`.
+Format: `/radio all "<1-line>"` with leading kind tag, e.g. `/radio all "[milestone] S4 landed"`.
 
-Without this reflex, sessions announce once on join then go silent — the bus becomes useless.
+## Step 0 — Pre-flight (run on every /radio invocation)
 
-### Anti-loop rule
-When a Monitor event fires with an incoming message, respond to it naturally — BUT:
-- If the message is a plain acknowledgment (e.g. "ok", "got it", "thanks"), do NOT reply. Just display it.
-- Only reply when the message is a question, task, or requires action.
-- Never reply to a message that was itself a reply to your own message unless new information requires it.
-This prevents infinite ping-pong between auto-responding sessions.
-
-Confirm: "Sent to **<peer>**"
-
-## Step 6: Heartbeat (keep-alive) + idle auto-stop
-
-Every ~30s while session is active, update your registry entry (re-append with fresh ts). This keeps you visible to new sessions joining. Also check idle-stop condition (no bus activity ≥15min AND peers ≤1) and self-exit if met:
 ```bash
-while true; do
-  jq -cn --arg name "<name>" --argjson ts $(date +%s) '{name:$name,ts:$ts}' >> /tmp/claude_bus_registry.jsonl
-  # idle auto-stop
-  last_msg_ts=$(tail -20 /tmp/claude_bus.jsonl 2>/dev/null | jq -r '.ts' | sort -n | tail -1)
-  peer_count=$(jq -s 'group_by(.name) | map(max_by(.ts)) | map(select(.ts >= (now - 60) and .name != "<name>")) | length' /tmp/claude_bus_registry.jsonl 2>/dev/null)
-  now_ts=$(date +%s)
-  if [ -n "$last_msg_ts" ] && [ $((now_ts - last_msg_ts)) -gt 900 ] && [ "${peer_count:-0}" -le 0 ]; then
-    jq -cn --arg to "all" --arg from "<name>" --arg msg "<name> idle-stop (15m quiet, no peers)" --argjson ts "$now_ts" --arg kind "leave" '{to:$to,from:$from,msg:$msg,ts:$ts,kind:$kind}' >> /tmp/claude_bus.jsonl
-    rm -f ~/.cache/claude_bus_active.json
-    exit 0
-  fi
-  sleep 30
+# 0a. Channel plugin loaded? Iron Law.
+PARENT_PID=$(ps -p $$ -o ppid= | tr -d ' ')
+CLAUDE_PID=""
+P=$PARENT_PID
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+  CMD=$(ps -p $P -o command= 2>/dev/null | awk '{print $1}')
+  BASE="${CMD##*/}"
+  if [ "$BASE" = "claude" ]; then CLAUDE_PID=$P; break; fi
+  P=$(ps -p $P -o ppid= 2>/dev/null | tr -d ' ')
+  [ -z "$P" ] || [ "$P" = "1" ] && break
+done
+[ -z "$CLAUDE_PID" ] && { echo "[radio] cannot locate claude ancestor PID"; exit 1; }
+ARGS=$(ps -p $CLAUDE_PID -o command=)
+echo "$ARGS" | grep -q -- "--channels[= ][^ ]*plugin:bus@local" || {
+  cat <<EOF >&2
+[radio] Channel plugin:bus@local not loaded.
+Re-run install_alias.sh or restart claude with --channels plugin:bus@local.
+EOF
+  exit 1
+}
+
+# 0b. Sweep stale sentinels (dead PIDs).
+for f in ~/.claude/bus/opted-in/*; do
+  [ -f "$f" ] || continue
+  pid=$(basename "$f")
+  kill -0 "$pid" 2>/dev/null || rm -f "$f"
 done
 ```
-Run this with `run_in_background: true`. When heartbeat exits via idle-stop, the Monitor tasks are still running — session will notice (no more heartbeats reach own monitor) and can call /bus stop to clean up, OR leave them; they die with session anyway.
 
-## Step 7: Consensus mode (key feature)
+## Step 1 — Resolve session_id
 
-When user says `/bus <question>` (anything after `/bus` that isn't `join <name>`) — **this session is the initiator**.
+Walk parent processes for the first ancestor whose argv0 basename is exactly `claude`. Same logic as `plugin/src/session.ts:40-63`. The Step 0 snippet above already computed `CLAUDE_PID` — that IS the `session_id`.
 
-### Auto-extract own context
-If the question references "my plan", "the plan", "what I proposed", "my last suggestion", or similar self-referential phrase, the initiator MUST extract the relevant content from its OWN recent conversation context (the last substantive proposal/plan/summary this session produced) and include the full text in the `msg` field of the round-1 broadcast. Do NOT ask the user to paste it — you already have it in context.
+Reuse:
 
-If the question is self-contained (e.g. "should we use Postgres or MySQL for X?"), just broadcast as-is.
+```bash
+SID=$CLAUDE_PID
+```
 
-Message envelope adds `round` and `kind` fields. Protocol:
+## Step 2 — Assign name A→Z
 
-**Round 1 — Positions**
-Initiator broadcasts `{kind:"q",round:1,msg:"<question + extracted plan if applicable>"}` to all active peers (to:"all").
-Each peer (including initiator) replies with `{kind:"pos",round:1,msg:"<my position + 1-line reasoning>"}` addressed `to:"*"` (i.e. broadcast).
+Atomic critical section via `flock`:
 
-**Round 2 — Critique**
-After receiving all round-1 positions, each peer broadcasts `{kind:"crit",round:2,msg:"<critique of weakest opposing position>"}`.
+```bash
+mkdir -p ~/.claude/bus
+NAME=$(
+  ( flock 9
+    # Dedupe by name, latest ts within 60s.
+    used=$(jq -s 'group_by(.name) | map(max_by(.ts)) |
+                  map(select(.ts >= (now - 60))) | map(.name) | .[]' \
+                  ~/.claude/bus/registry.jsonl 2>/dev/null | tr -d '"')
+    for L in A B C D E F G H I J K L M N O P Q R S T U V W X Y Z; do
+      echo "$used" | grep -qx "$L" || { echo "$L"; break; }
+    done
+  ) 9>~/.claude/bus/registry.lock
+)
+[ -z "$NAME" ] && NAME=AA   # A-Z exhausted, fallback
+jq -cn --arg n "$NAME" --arg sid "$SID" --argjson ts $(date +%s) \
+  '{name:$n, session_id:$sid, ts:$ts}' >> ~/.claude/bus/registry.jsonl
+echo "Joined as **$NAME**"
+```
 
-**Round 3 — Vote**
-Each peer broadcasts `{kind:"vote",round:3,msg:"<final answer in <=20 words>"}`.
+## Step 3 — Write opt-in sentinel
 
-**Aggregation (initiator only)**
-Initiator collects all round-3 votes, then:
-- If ≥75% agree → announce consensus: "CONSENSUS: <answer>"
-- If not → announce split: "NO CONSENSUS. Positions: A=<n>, B=<m>, ..."
-Write final result `{kind:"result",round:0,msg:"<summary>"}` to bus broadcast.
+```bash
+mkdir -p ~/.claude/bus/opted-in
+echo "joined $(date -u +%FT%TZ) name=$NAME" > ~/.claude/bus/opted-in/$SID
+```
 
-**Termination guarantees**
-- Hard cap: 3 rounds. Never start round 4.
-- Each peer responds at most ONCE per round.
-- If a peer doesn't respond within 60s of round start, initiator proceeds without them.
-- Non-initiator sessions: after round 3 vote, stop. Do not reply to `result`.
+The plugin reads this **once on startup**. If you joined after `claude` started without prior opt-in, the plugin is already idle (zero CPU, no tails) — see § Plugin lifecycle.
 
-**Protocol enforcement**
-Peer sessions receiving `kind:"q"` or `kind:"pos"` etc. should follow the protocol strictly — don't free-form chat during a consensus run. Resume free-form only after a `kind:"result"` is seen or user says `/bus end-consensus`.
+## Step 4 — Heartbeat + idle auto-stop
 
-## Step 8: Stop / leave bus
+Background loop, every 30s; auto-stop after 900s quiet AND 0 peers:
 
-When user says `/bus stop`, `/bus leave`, `/bus off`, `/bus quit`, or `stop bus`:
+```bash
+nohup bash -c '
+  while true; do
+    jq -cn --arg n "'"$NAME"'" --arg sid "'"$SID"'" --argjson ts $(date +%s) \
+      "{name:\$n, session_id:\$sid, ts:\$ts}" >> ~/.claude/bus/registry.jsonl
+    last=$(tail -20 ~/.claude/bus/all.jsonl 2>/dev/null | jq -r ".ts" | sort | tail -1)
+    last_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${last%.*}" +%s 2>/dev/null || echo 0)
+    peers=$(jq -s "group_by(.name) | map(max_by(.ts)) |
+                   map(select(.ts >= (now - 60) and .name != \"'"$NAME"'\")) | length" \
+                   ~/.claude/bus/registry.jsonl 2>/dev/null)
+    now=$(date +%s)
+    if [ $((now - last_epoch)) -gt 900 ] && [ "${peers:-0}" -le 0 ]; then
+      BUS_NAME='"$NAME"' bun run ~/.claude/skills/bus/plugin/src/cli/send.ts all "$NAME idle-stop"
+      rm -f ~/.claude/bus/opted-in/'"$SID"'
+      exit 0
+    fi
+    sleep 30
+  done
+' >/dev/null 2>&1 &
+```
 
-1. **Broadcast leave notice** (optional but polite):
-   ```bash
-   jq -cn --arg to "all" --arg from "<my_name>" --arg msg "<my_name> leaving bus" --argjson ts $(date +%s) --arg kind "leave" \
-     '{to:$to,from:$from,msg:$msg,ts:$ts,kind:$kind}' >> /tmp/claude_bus.jsonl
-   ```
+## Step 5 — Send verbs (single shared writer)
 
-2. **Stop both Monitor tasks** using TaskStop on the task IDs recorded when Monitors were started (one for `bus messages for <name>`, one for `bus peer joins for <name>`).
+Every send goes through `plugin/src/cli/send.ts`, which calls `writer.ts` (`appendBroadcast`/`appendTargeted`/`appendReply`). The skill bash NEVER writes JSON to spool files directly — Sh1 single-source enforcement.
 
-3. **Kill heartbeat background bash** using TaskStop on the heartbeat loop's task ID (recorded when the Step 6 `while true` loop was spawned).
+```bash
+# /radio tell <name> "msg"
+TARGET_NAME=$1; PAYLOAD=$2
+TARGET_SID=$(jq -s --arg n "$TARGET_NAME" \
+  'group_by(.name) | map(max_by(.ts)) |
+   map(select(.name == $n and .ts >= (now - 60))) | .[0].session_id' \
+  ~/.claude/bus/registry.jsonl 2>/dev/null | tr -d '"')
+[ -z "$TARGET_SID" ] || [ "$TARGET_SID" = "null" ] && {
+  echo "[radio] no peer named $TARGET_NAME within 60s window"; exit 1;
+}
+BUS_NAME=$NAME BUS_TARGET_SID=$TARGET_SID \
+  bun run ~/.claude/skills/bus/plugin/src/cli/send.ts tell "$TARGET_NAME" "$PAYLOAD"
 
-4. **Delete active marker:** `rm -f ~/.cache/claude_bus_active.json` (stops the reminder hook from injecting context).
+# /radio ask <name> "msg" — same as tell, verb=ask
+BUS_NAME=$NAME BUS_TARGET_SID=$TARGET_SID \
+  bun run ~/.claude/skills/bus/plugin/src/cli/send.ts ask "$TARGET_NAME" "$PAYLOAD"
 
-5. **Do NOT delete registry/bus files** — other peers may still be active; files are shared. Your entry will time out naturally in 60s.
+# /radio all "msg"
+BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts all "$PAYLOAD"
 
-Confirm: "Bus stopped. Monitors + heartbeat killed; registry entry expires in 60s."
+# /radio consensus <q>
+BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts consensus "$Q"
 
-**When to use:**
-- You want a clean terminal with no auto-notifications
-- Many dead peer sessions are cluttering your peer-join stream
-- Preparing to /clear or switch topics
+# @A msg / @all msg → route to tell / all (parse @ prefix)
+```
 
-**When NOT needed:**
-- Session about to end anyway (all bus tasks die with session — no cleanup required)
-- Short pause (monitors are cheap; leave running)
+### Consensus protocol (mode=consensus)
 
-## Notes
-- Multiple sessions = each discovers all others active within 60s
-- 4 sessions all run `/bus` → each sees the other 3 in peer list
-- Registry grows indefinitely; ignore stale entries (ts > 60s old)
-- Bus file grows indefinitely; only recent messages matter (Monitor handles this via tail)
-- Best outcome for consensus: 3-5 peers. With 2, it's just a debate. With >6, rounds get noisy.
-- **Track task IDs** when you start Monitors (Step 4) + heartbeat (Step 6) — needed for `/bus stop`. If not recorded, use `TaskList` to find them by description.
+3 rounds, hard-capped:
+
+1. **Round 1 — Positions** — initiator broadcasts `mode=consensus` with question. Each peer replies `mode=reply` with their position + 1-line reasoning.
+2. **Round 2 — Critique** — each peer broadcasts `mode=consensus` round=2 critiquing the weakest opposing position.
+3. **Round 3 — Vote** — each peer broadcasts a final ≤20-word answer.
+
+Aggregation (initiator only): collect round-3 votes; if ≥75% agree → `/radio all "CONSENSUS: <answer>"`; else `/radio all "NO CONSENSUS. Positions: ..."`.
+
+Termination guarantees: 60s/round timeout; cap 3 rounds; one vote per peer per round; non-initiators stop after round 3.
+
+## Step 6 — Stop verbs
+
+`/radio stop` (also `off`/`leave`/`quit`/`stop bus`/`stop radio`):
+
+```bash
+# Broadcast leave notice
+BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts all "$NAME leaving"
+
+# SIGTERM the plugin tails (sentinel removal alone won't stop them — per OI-S3-2).
+PLUGIN_PID_FILE=~/.claude/bus/plugin-pid/$SID
+if [ -f "$PLUGIN_PID_FILE" ]; then
+  kill -TERM "$(cat $PLUGIN_PID_FILE)" 2>/dev/null
+  rm -f "$PLUGIN_PID_FILE"
+else
+  pkill -TERM -f "plugin:bus@local.*$SID" 2>/dev/null
+fi
+
+# Remove sentinel + heartbeat
+rm -f ~/.claude/bus/opted-in/$SID
+# Heartbeat process is the bash backgrounded in Step 4 — TaskStop its task_id
+# (recorded when started), or it auto-exits when sentinel disappears next loop.
+
+echo "Radio stopped. Plugin tails killed; sentinel removed; registry entry expires in 60s."
+```
+
+## Plugin lifecycle
+
+- Plugin **auto-attaches** at session start via `--channels plugin:bus@local` flag in claude alias. No skill action needed at launch.
+- Plugin reads sentinel **ONCE at startup** (per OI-S3-1). If you `/radio join` after starting `claude` without having previously been opted-in, the plugin is already idle and tails are not running. Fix:
+  ```
+  exec claude --channels plugin:bus@local --resume <session_id>
+  ```
+  Or restart the session normally (next start will check sentinel).
+- Plugin writes its own PID to `~/.claude/bus/plugin-pid/<sessionId>` on startup (per server.ts shutdown handler removes it). `/radio stop` reads that file to SIGTERM the right process.
+
+## References
+
+- Writer (single source): `~/.claude/skills/bus/plugin/src/writer.ts`
+- Send CLI (skill→writer adapter): `~/.claude/skills/bus/plugin/src/cli/send.ts`
+- Plugin server: `~/.claude/skills/bus/plugin/server.ts`
+- Session id walker: `~/.claude/skills/bus/plugin/src/session.ts`
+- Sentinel reader/sweeper: `~/.claude/skills/bus/plugin/src/sentinel.ts`
+- Spool tailer: `~/.claude/skills/bus/plugin/src/spool.ts`
+- Envelope schema: `~/.claude/skills/bus/plugin/src/types.ts`
+- Spec + plan: `~/.ship/bus-channel-redesign/goals/{01-spec.md, 02-plan.md}`
+- v1 backup: `~/.claude/skills/bus/SKILL.md.v1-backup`
