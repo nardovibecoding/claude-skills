@@ -20,6 +20,7 @@ Run unified maintenance via lazy-loaded phase files. SKILL.md is the dispatcher 
 | `/lint --fix` | 1 with `--fix` + 1.5 + index rebuild + graph sync | `phase-1-scan.md`, `phase-1.5-dedup.md` |
 | `/lint --memory` | 3 + 4 + 5 | `phase-3-mining.md`, `phase-4-stale.md`, `phase-5-promote.md` |
 | `/lint --skills` | 6 only | `phase-6-skills.md` |
+| `/lint --claudemd` | 5b + 8 | `phase-5-promote.md`, `phase-8-claudemd.md` |
 | `/lint --unattended` | 1 + 1.5 + 2 + 3 + 4 + 5a + 5b (Phase 6 + 7 skipped) | `unattended.md` (which references each phase file) |
 
 Always run **Capacity monitoring** at end (table below — small enough to keep inline).
