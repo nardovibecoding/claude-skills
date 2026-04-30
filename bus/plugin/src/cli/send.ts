@@ -138,7 +138,7 @@ async function main(): Promise<void> {
   if (replyTo) envelope.in_reply_to = replyTo;
 
   try {
-    if (verb === "all" || verb === "consensus") {
+    if (verb === "all" || verb === "consensus" || verb === "vote") {
       await appendBroadcast(envelope);
     } else if (verb === "reply") {
       // target may be a bus name or numeric sid; resolve_name.sh handles both.
