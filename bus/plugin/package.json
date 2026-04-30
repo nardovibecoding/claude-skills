@@ -1,0 +1,17 @@
+{
+  "name": "bus-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "^5.6.0"
+  }
+}
