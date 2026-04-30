@@ -1,6 +1,6 @@
 ---
 name: todo
-description: Snapshot current conversation in ≤3 sentences PLUS list every open loop / dangling digression — points where Bernard asked something, got an answer, then pivoted without deciding. Also surfaces assistant-side promises never fulfilled. Use when Bernard calls /todo (or legacy /snap). No preamble, no offers, no follow-up.
+description: Snapshot current conversation in ≤3 sentences PLUS list every open loop / dangling digression — points where Bernard asked something, got an answer, then pivoted without deciding. Also surfaces assistant-side promises never fulfilled. Then immediately drives 1-by-1 resolution via AskUserQuestion, one loop per question, until all are decided or Bernard says stop. Use when Bernard calls /todo (or legacy /snap).
 user_invocable: true
 ---
 
