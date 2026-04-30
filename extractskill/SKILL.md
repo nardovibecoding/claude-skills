@@ -52,11 +52,11 @@ Score against Bernard's existing system:
 
 ### Step 3: Security Scan (MANDATORY — not optional)
 
-**Must run before any INSTALL.** Invoke `skill-security-auditor` skill on the fetched skill directory. Do NOT fall back to manual grep — the auditor covers 11+ threat categories the eyeball-check misses.
+**Must run before any INSTALL.** Invoke the security auditor script directly (folded into /upskill 2026-04-30; old `skill-security-auditor` skill retired). Do NOT fall back to manual grep — the auditor covers 11+ threat categories the eyeball-check misses.
 
 ```bash
-# Point auditor at the fetched skill
-~/.claude/skills/skill-security-auditor/scripts/skill_security_auditor.py <fetched-skill-dir>
+# Point auditor at the fetched skill (script path moved 2026-04-30)
+python3 ~/.claude/skills/upskill/scripts/skill_security_auditor.py <fetched-skill-dir>
 ```
 
 Gate logic:
