@@ -273,4 +273,6 @@ Bad (mental-math timestamps):
 
 ## Output
 
-Just the snapshot + open-loops block (+ assistant-promises block if any). Nothing before, nothing after.
+Snapshot + open-loops block (+ assistant-promises block if any), then immediately the first AskUserQuestion of resolution mode in the same turn. Nothing else before, nothing else after.
+
+Skip the AskUserQuestion only when (a) Open loops = none, or (b) Bernard invoked with `list-only` / "just list" / "snapshot only" / "no questions".
