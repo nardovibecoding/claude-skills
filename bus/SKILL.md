@@ -209,3 +209,7 @@ echo "Radio stopped. Plugin tails killed; sentinel removed; registry entries dro
 ## References
 
 `plugin/src/{writer,session,sentinel,spool,types}.ts`, `plugin/src/cli/send.ts`, `plugin/server.ts`, `~/.ship/bus-channel-redesign/goals/{01-spec.md,02-plan.md}`. v1 archived at `SKILL.md.v1-backup`.
+
+## v1 decommission status
+
+v1 hook decommissioned 2026-04-30 (S8). `bus_reminder.py` renamed `.disabled`. `settings.json` UserPromptSubmit hook entry removed (backup at `~/.claude/settings.json.bak.s8.*`). v1 SKILL.md preserved at `SKILL.md.v1-backup`. Re-enable: `mv ~/.claude/hooks/bus_reminder.py{.disabled,}` + restore settings.json from latest `.bak.s8.*`.
