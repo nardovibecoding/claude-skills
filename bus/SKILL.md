@@ -162,7 +162,19 @@ Syntax aliases: `@A msg` → `tell A "msg"`; `@all msg` → `all "msg"`.
 
 ### Consensus protocol (mode=consensus)
 
-3 hard-capped rounds: (R1) positions + 1-line reasoning, (R2) critique weakest opposing position, (R3) final ≤20-word answer. Initiator aggregates R3 votes: ≥75% → `/radio all "CONSENSUS: <answer>"`; else `/radio all "NO CONSENSUS. ..."`. 60s/round timeout; one vote per peer per round; non-initiators stop after R3.
+**Initiator** (`/radio consensus <question>`):
+```bash
+BUS_NAME=$NAME BUS_SID=$SID bash ~/.claude/skills/bus/scripts/consensus.sh "$QUESTION"
+```
+The script runs 3 rounds (hard cap). Each round:
+1. Broadcasts `kind=question` envelope to `all.jsonl`
+2. Waits 60s polling initiator's inbox for `kind=vote` envelopes
+3. Tallies votes (dedup by from+round); if `agree*100/total >= 75` → CONSENSUS, early exit
+After final round (or early exit): broadcasts `kind=verdict` envelope to `all.jsonl`.
+
+**Threshold**: integer math — `agree*100/total >= 75`. So 3/4=75 PASSES, 2/3=66 FAILS. Zero responses = no consensus.
+
+**Peer** (non-initiator): on receiving `kind=question`, cast one vote per round (see Mode behavior above). On receiving `kind=verdict`, display to user and stop.
 
 ## Step 6 — Stop verbs
 
