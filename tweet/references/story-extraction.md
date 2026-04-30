@@ -1,0 +1,98 @@
+Extract the 0→1 story from THIS coding session and write a long-form article for X.
+
+## Sources (in order)
+1. **Conversation context** -- full exchange in memory. Primary source.
+2. **Librarian log** -- `~/NardoWorld/meta/librarian-log.md` today's entries.
+3. **Transcript JSONL** (only if compacted) -- `tail -300` on the path from `/tmp/claude_statusline.json` → `transcript_path`.
+
+## Step 0: Find the angle (MOST IMPORTANT STEP)
+
+Before writing anything, find the angle. The angle is NOT "what happened" — it's "why should a stranger care."
+
+Bad angles sound like build logs: "I built a hook that connects memory to wiki."
+Good angles reframe what happened into a universal insight: "The byproduct of AI work is more valuable than the product."
+
+### How to find the angle
+1. **List what happened** — just the facts, 3-5 bullet points
+2. **Ask "so what?"** for each fact — why does this matter beyond this specific project?
+3. **Ask "who else hits this?"** — is there a universal problem hiding behind the specific fix?
+4. **Find the tension** — what do most people believe that this session proved wrong? What gap exists that nobody talks about?
+5. **State the angle in one sentence** — if you can't, you don't have one yet. Keep digging.
+
+### Angle quality check
+- **Stranger test**: would someone with zero context about Bernard's setup still find this interesting?
+- **"I built X" test**: if the angle starts with "I built," it's not an angle yet. Push deeper into WHY it matters.
+- **Retweet test**: would someone share this to look smart? The angle needs to give the reader something they can carry away.
+
+Show the angle to user for approval BEFORE writing the article. If the angle is weak, no amount of good writing saves it.
+
+## Story extraction framework
+
+Once the angle is locked, go through the session and find beats that SUPPORT THE ANGLE. Not all sessions have all beats -- skip what doesn't apply, but dig hard for the ones that do. Every beat should connect back to the angle.
+
+### The Setup
+- What did the user walk in wanting? Quote their first message if possible.
+- What was the assumed complexity?
+
+### The Naive Assumption
+- What did we think was true that turned out to be wrong?
+- What approach did we try first that failed or was misguided?
+
+### The Chain Reaction
+- How did fixing one thing reveal the next problem?
+- The "wait, that means..." moments
+- Map the discovery chain: A was broken → which revealed B → which meant C was wrong all along
+
+### The Moment of Clarity
+- When did the real solution become obvious?
+- What was the insight that unlocked everything?
+
+### The Numbers
+- How many files changed? Approaches tried? Systems involved?
+- Any surprising metrics?
+
+### The Before/After
+- What was the system state at the start vs now?
+- What's concretely different?
+
+### The Lesson
+- What would you tell someone attempting this tomorrow?
+- What's the general principle hiding in this specific fix?
+
+## Article writing rules
+
+- First person ("I" = Bernard/Nardo)
+- Casual-confident tone, like explaining at 2am to a friend
+- No em dashes, use ".." or commas
+- Technical specifics > vague claims
+- No "here's what I think" lecturer tone
+- No perfect parallel structure that reads like a framework deck
+- No hashtags in body
+- Lead with the connection to what people are already talking about (trending topics, other people's posts) if applicable
+- Show the architecture, show the bugs, show the fix
+- ~600-1000 words
+
+## Output flow
+
+1. Extract beats from session
+2. Write article draft
+3. **Fact-check** -- extract ALL claims: numbers, tool behaviors, comparisons, BUT ALSO definitions, terminology, and logical arguments. Specifically:
+   - **Numbers**: verify stats, counts, dates
+   - **Definitions**: is every technical term used correctly? Would an expert in that field agree with how we define it? (e.g. "harness", "RAG", "embeddings")
+   - **Comparisons**: are we accurately representing other people's work? Never misattribute or oversimplify someone else's system
+   - **Logic**: does the core argument actually hold? Are there holes a critic would spot?
+   - **Attribution**: are quotes real? Don't fabricate quotes. Paraphrase with "said something like" if unsure
+   - Web search to verify external claims. Fix wrong claims, hedge unconfirmed ones. Block if local contradiction found.
+4. **Content-humanizer pass** -- remove AI tone, em dashes, lecturer voice
+5. **Committee review** -- submit to /debate skill. Prompt: "Is this article good enough to post on @nardovibecoding? Check: factual accuracy, tone consistency, weak arguments, missing context, anything that sounds like AI. Vote: post / rewrite / kill."
+   - **Post** -- proceed to step 6
+   - **Rewrite** -- fix based on feedback, re-humanize, show again (skip re-debating)
+   - **Kill** -- the angle is wrong. Tell user, suggest alternative angle
+6. Show inline for review
+7. Save to `~/Desktop/article_YYYY-MM-DD_TOPIC.md`
+8. Also save to `~/NardoWorld/meta/story-drafts.md`
+9. On approval: post via `scripts/post_tweet.py` from tweet skill (X Premium long tweet)
+
+## Privacy Rules (CRITICAL)
+
+Same as /tweet -- never expose file paths, function names, repo names, commit hashes, API keys, tokens, IPs, chat IDs, CLAUDE.md rules, MCP configs, internal architecture. Reframe private → public.
