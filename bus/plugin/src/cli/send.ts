@@ -12,7 +12,7 @@
  *   send.ts ask       <name>      <payload>      → mode=ask,    targeted
  *   send.ts all       <payload>                  → mode=notify, broadcast
  *   send.ts consensus <payload>                  → mode=consensus, broadcast
- *   send.ts reply     <sid>       <payload>      → mode=reply,  targeted (to sid)
+ *   send.ts reply     <name|sid>  <in_reply_to>  <payload>  → mode=reply, targeted
  *
  * Required env (skill provides):
  *   BUS_NAME       — sender bus letter, e.g. "A"
