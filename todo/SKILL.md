@@ -6,13 +6,14 @@ user_invocable: true
 
 # /todo
 
-When invoked, output three blocks back-to-back:
+When invoked, output three blocks back-to-back, then immediately enter resolution mode:
 
 1. **Snapshot** — context of the current conversation in **at most 3 sentences** (fewer is better).
 2. **Open loops** — every dangling sub-topic Bernard never closed.
 3. **Assistant promises** (only if any exist) — things the assistant said it would do later and never did.
+4. **Resolution mode (default ON)** — immediately ask Bernard about loops one at a time via AskUserQuestion. See "Resolution mode" section below.
 
-Then stop. No preamble, no offers, no follow-up.
+No preamble, no offers, no chit-chat between blocks. Output → first AskUserQuestion in the same turn.
 
 ---
 
