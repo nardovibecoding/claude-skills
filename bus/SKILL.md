@@ -44,7 +44,15 @@ When a channel push arrives, the meta block carries `mode`. The model running th
   BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts reply <X> <id> "<your-answer>"
   ```
   This relays your answer back to sender A's inbox. The relay call is mandatory — without it, A never receives your response. After sending, do NOT chain any further replies on your own initiative.
-- **`mode=consensus`** — follow the 3-round consensus protocol below. One vote per round; hard cap 3; 75% threshold.
+- **`mode=consensus kind=question`** — a consensus round question has arrived. Cast ONE vote for this round via:
+  ```bash
+  BUS_NAME=$NAME BUS_TARGET_SID=<from_session_id> \
+    bun run ~/.claude/skills/bus/plugin/src/cli/send.ts vote \
+    <consensus_id> <round> <agree|disagree> "<1-line reason <=20 words>"
+  ```
+  Only one vote per round (initiator deduplicates by from+round). Do not free-form chat during the consensus run.
+- **`mode=consensus kind=vote`** — silently log; do not respond. Vote envelopes are routed to the initiator's inbox only; non-initiators should never receive them in normal operation.
+- **`mode=consensus kind=verdict`** — display the verdict to the user (CONSENSUS or NO-CONSENSUS with final round and agree/total). No further action. Resume free-form after verdict or after user says `/radio end-consensus`.
 - **`mode=reply`** — when you receive `<channel source='bus' mode='reply' from='<X>' in_reply_to='<id>'>`, display the reply and update your context. **Do not call `send.ts reply` again** (anti-loop rule). The conversation ends here unless the user explicitly asks you to follow up.
 
 ## Anti-loop discipline
