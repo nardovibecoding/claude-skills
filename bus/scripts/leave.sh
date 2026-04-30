@@ -18,7 +18,7 @@ SID=$(_bus_resolve_sid) || {
 if ! _bus_lock_acquire; then
   _bus_emit_json false "" "$SID" "lock_timeout"
   exit 1
-}
+fi
 trap _bus_lock_release EXIT INT TERM
 
 # SIGTERM plugin if its PID file exists. Read before delete; ignore kill failures.
