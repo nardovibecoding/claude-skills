@@ -8,19 +8,21 @@
  * 2026-04-29_multi-channel-shared-storage.md.)
  *
  * Usage:
- *   send.ts tell      <name>      <payload>      → mode=notify, targeted
- *   send.ts ask       <name>      <payload>      → mode=ask,    targeted
- *   send.ts all       <payload>                  → mode=notify, broadcast
- *   send.ts consensus <payload>                  → mode=consensus, broadcast
- *   send.ts reply     <name|sid>  <in_reply_to>  <payload>  → mode=reply, targeted
+ *   send.ts tell      <name>      <payload>                                -> mode=notify, targeted
+ *   send.ts ask       <name>      <payload>                                -> mode=ask,    targeted
+ *   send.ts all       <payload>                                            -> mode=notify, broadcast
+ *   send.ts consensus <payload>                                            -> mode=consensus, broadcast
+ *   send.ts reply     <name|sid>  <in_reply_to>  <payload>                -> mode=reply, targeted
+ *   send.ts vote      <consensus_id> <round> <agree|disagree> "<reason>"  -> mode=consensus kind=vote, targeted to initiator
  *
  * Required env (skill provides):
- *   BUS_NAME       — sender bus letter, e.g. "A"
- *   BUS_TARGET_SID — for `tell`/`ask`: the resolved sessionId for <name>.
+ *   BUS_NAME       - sender bus letter, e.g. "A"
+ *   BUS_TARGET_SID - for tell/ask/vote: the resolved sessionId for target.
  *                    Skill resolves via registry lookup before calling CLI.
+ *                    For vote: must be the initiator session_id (found via all.jsonl scan).
  *
  * Optional env:
- *   BUS_IN_REPLY_TO — original msg_id when verb=reply
+ *   BUS_IN_REPLY_TO - original msg_id when verb=reply
  *
  * Output: prints {"ok":true,"msg_id":"..."} on stdout, exits 0.
  *         On error: prints "[send] <msg>" to stderr, exits 2.
@@ -38,6 +40,7 @@ import {
 import type { BusEnvelope, BusMode } from "../types.js";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import os from "node:os";
 
 type Verb = "tell" | "ask" | "all" | "consensus" | "reply" | "vote";
 
@@ -55,17 +58,19 @@ function die(msg: string, code = 2): never {
   process.exit(code);
 }
 
-function parseArgs(argv: string[]): {
-  verb: Verb;
-  target?: string;
-  inReplyTo?: string;
-  payload: string;
-} {
-  if (argv.length < 2) die("usage: send.ts <verb> [target] [in_reply_to] <payload>");
+// Discriminated union so each path has its exact args available.
+type ParsedArgs =
+  | { verb: "tell" | "ask"; target: string; payload: string }
+  | { verb: "all" | "consensus"; payload: string }
+  | { verb: "reply"; target: string; inReplyTo: string; payload: string }
+  | { verb: "vote"; consensusId: string; round: number; stance: "agree" | "disagree"; reason: string; payload: string };
+
+function parseArgs(argv: string[]): ParsedArgs {
+  if (argv.length < 2) die("usage: send.ts <verb> [args...] <payload>");
   const verb = argv[0] as Verb;
   if (!(verb in VERB_TO_MODE)) die(`unknown verb: ${verb}`);
 
-  if (verb === "all" || verb === "consensus" || verb === "vote") {
+  if (verb === "all" || verb === "consensus") {
     if (argv.length !== 2) die(`${verb} takes exactly 1 arg: <payload>`);
     return { verb, payload: argv[1]! };
   }
@@ -73,6 +78,22 @@ function parseArgs(argv: string[]): {
     // reply <target> <in_reply_to_msg_id> <payload>
     if (argv.length !== 4) die(`reply takes 3 args: <target> <in_reply_to_msg_id> <payload>`);
     return { verb, target: argv[1]!, inReplyTo: argv[2]!, payload: argv[3]! };
+  }
+  if (verb === "vote") {
+    // vote <consensus_id> <round> <agree|disagree> "<reason>"
+    if (argv.length !== 5) die("vote takes 4 args: <consensus_id> <round> <agree|disagree> <reason>");
+    const round = parseInt(argv[2]!, 10);
+    if (isNaN(round) || round < 1 || round > 3) die(`vote round must be 1-3; got: ${argv[2]}`);
+    const stance = argv[3] as "agree" | "disagree";
+    if (stance !== "agree" && stance !== "disagree") die(`stance must be agree|disagree; got: ${argv[3]}`);
+    return {
+      verb,
+      consensusId: argv[1]!,
+      round,
+      stance,
+      reason: argv[4]!,
+      payload: `${stance}: ${argv[4]!}`,
+    };
   }
   // tell / ask: <target> <payload>
   if (argv.length !== 3) die(`${verb} takes 2 args: <target> <payload>`);
@@ -84,7 +105,7 @@ function resolveNameToSid(nameOrSid: string): string {
   if (/^\d+$/.test(nameOrSid)) return nameOrSid;
   // Name: call resolve_name.sh.
   const script = path.resolve(
-    __dirname,
+    import.meta.dir,
     "..",
     "..",
     "..",
@@ -102,8 +123,30 @@ function resolveNameToSid(nameOrSid: string): string {
   return sid;
 }
 
+/**
+ * For vote verb: find initiator session_id by scanning all.jsonl for the
+ * most recent kind=question envelope matching consensus_id.
+ * BUS_TARGET_SID env takes precedence (set by consensus.sh or test harness).
+ */
+function resolveInitiatorSid(consensusId: string): string {
+  const envSid = process.env.BUS_TARGET_SID;
+  if (envSid && /^\d+$/.test(envSid)) return envSid;
+
+  const allJsonl = path.join(os.homedir(), ".claude", "bus", "all.jsonl");
+  const r = spawnSync("sh", [
+    "-c",
+    // jq: filter question envelopes for this consensus_id, emit from_session_id, take last
+    `jq -r --arg cid "${consensusId}" 'select(.consensus_id == $cid and .kind == "question") | .from_session_id' "${allJsonl}" 2>/dev/null | tail -1`,
+  ], { encoding: "utf8" });
+  const sid = (r.stdout ?? "").trim();
+  if (!sid || !/^\d+$/.test(sid)) {
+    die(`cannot resolve initiator for consensus_id=${consensusId}; set BUS_TARGET_SID`);
+  }
+  return sid;
+}
+
 async function main(): Promise<void> {
-  const { verb, target, inReplyTo, payload } = parseArgs(process.argv.slice(2));
+  const parsed = parseArgs(process.argv.slice(2));
 
   // Resolve sender session_id from process tree (claude PID).
   let sid: string;
@@ -119,58 +162,99 @@ async function main(): Promise<void> {
     die("BUS_NAME env required (skill must export sender bus letter)");
   }
 
-  const mode = VERB_TO_MODE[verb];
   const ts = new Date().toISOString();
   const msg_id = `${sid}-${Date.now()}`;
 
+  // --- vote verb: targeted to initiator's inbox with consensus fields ---
+  if (parsed.verb === "vote") {
+    const initiatorSid = resolveInitiatorSid(parsed.consensusId);
+    const envelope: BusEnvelope = {
+      msg_id,
+      from: busName,
+      from_session_id: sid,
+      to: initiatorSid,
+      mode: "consensus",
+      ts,
+      payload: parsed.payload,
+      round: parsed.round,
+      kind: "vote",
+      consensus_id: parsed.consensusId,
+    };
+    try {
+      await appendTargeted(initiatorSid, envelope);
+    } catch (e) {
+      die(`write failed: ${(e as Error).message}`);
+    }
+    process.stdout.write(JSON.stringify({ ok: true, msg_id }) + "\n");
+    process.exit(0);
+  }
+
+  // --- reply verb: targeted back to original sender ---
+  if (parsed.verb === "reply") {
+    const envelope: BusEnvelope = {
+      msg_id,
+      from: busName,
+      from_session_id: sid,
+      to: parsed.target,
+      mode: "reply",
+      ts,
+      payload: parsed.payload,
+      in_reply_to: parsed.inReplyTo,
+    };
+    try {
+      const recipientSid = resolveNameToSid(parsed.target);
+      await appendReply(recipientSid, { ...envelope, reply_from: busName });
+    } catch (e) {
+      die(`write failed: ${(e as Error).message}`);
+    }
+    process.stdout.write(
+      JSON.stringify({ ok: true, msg_id, in_reply_to: parsed.inReplyTo }) + "\n",
+    );
+    process.exit(0);
+  }
+
+  // --- all / consensus: broadcast ---
+  if (parsed.verb === "all" || parsed.verb === "consensus") {
+    const envelope: BusEnvelope = {
+      msg_id,
+      from: busName,
+      from_session_id: sid,
+      to: "all",
+      mode: VERB_TO_MODE[parsed.verb],
+      ts,
+      payload: parsed.payload,
+    };
+    const replyTo = process.env.BUS_IN_REPLY_TO;
+    if (replyTo) envelope.in_reply_to = replyTo;
+    try {
+      await appendBroadcast(envelope);
+    } catch (e) {
+      die(`write failed: ${(e as Error).message}`);
+    }
+    process.stdout.write(JSON.stringify({ ok: true, msg_id }) + "\n");
+    process.exit(0);
+  }
+
+  // --- tell / ask: targeted ---
   const envelope: BusEnvelope = {
     msg_id,
     from: busName,
     from_session_id: sid,
-    to: verb === "all" || verb === "consensus" || verb === "vote" ? "all" : target!,
-    mode,
+    to: parsed.target,
+    mode: VERB_TO_MODE[parsed.verb],
     ts,
-    payload,
+    payload: parsed.payload,
   };
-
-  // in_reply_to: prefer explicit arg (reply verb), then env fallback.
-  const replyTo = inReplyTo ?? process.env.BUS_IN_REPLY_TO;
+  const replyTo = process.env.BUS_IN_REPLY_TO;
   if (replyTo) envelope.in_reply_to = replyTo;
-
-  // Consensus envelope fields — required by writer validation when mode=consensus.
-  // Skill provides these via env (BUS_ROUND, BUS_KIND, BUS_CONSENSUS_ID).
-  if (mode === "consensus") {
-    const roundStr = process.env.BUS_ROUND;
-    const kind = process.env.BUS_KIND as "question" | "vote" | "verdict" | undefined;
-    const consensusId = process.env.BUS_CONSENSUS_ID;
-    if (roundStr) envelope.round = Number(roundStr);
-    if (kind) envelope.kind = kind;
-    if (consensusId) envelope.consensus_id = consensusId;
-  }
-
   try {
-    if (verb === "all" || verb === "consensus" || verb === "vote") {
-      await appendBroadcast(envelope);
-    } else if (verb === "reply") {
-      // target may be a bus name or numeric sid; resolve_name.sh handles both.
-      const recipientSid = resolveNameToSid(target!);
-      // appendReply enriches envelope with mode=reply + reply_from.
-      await appendReply(recipientSid, { ...envelope, reply_from: busName });
-      process.stdout.write(
-        JSON.stringify({ ok: true, msg_id, in_reply_to: replyTo ?? null }) + "\n",
+    const targetSid = process.env.BUS_TARGET_SID ?? parsed.target;
+    if (!/^\d+$/.test(targetSid)) {
+      die(
+        `target session_id must be numeric (skill resolves <name>-><sid> via registry); got: ${targetSid}`,
       );
-      process.exit(0);
-    } else {
-      // tell / ask: target is the resolved sessionId (skill resolves name→sid)
-      const targetSid = process.env.BUS_TARGET_SID ?? target!;
-      if (!/^\d+$/.test(targetSid)) {
-        die(
-          `target session_id must be numeric (skill resolves <name>→<sid> via registry); got: ${targetSid}`,
-        );
-      }
-      // mutate envelope.to to the bus name (human-readable) but route by sid
-      await appendTargeted(targetSid, envelope);
     }
+    await appendTargeted(targetSid, envelope);
   } catch (e) {
     die(`write failed: ${(e as Error).message}`);
   }
@@ -179,8 +263,8 @@ async function main(): Promise<void> {
   process.exit(0);
 }
 
-// Test-only export (skips main() when imported)
-export { parseArgs, VERB_TO_MODE, resolveNameToSid };
+// Test-only exports (skips main() when imported)
+export { parseArgs, VERB_TO_MODE, resolveNameToSid, resolveInitiatorSid };
 
 if (import.meta.main) {
   await main();
