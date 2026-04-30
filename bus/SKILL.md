@@ -214,6 +214,43 @@ echo "Radio stopped. Plugin tails killed; sentinel removed; registry entries dro
 
 `plugin/src/{writer,session,sentinel,spool,types}.ts`, `plugin/src/cli/send.ts`, `plugin/server.ts`, `~/.ship/bus-channel-redesign/goals/{01-spec.md,02-plan.md}`. v1 archived at `SKILL.md.v1-backup`.
 
+## § File coordination (claim/release)
+
+Sessions can lock a file path so no other session's Edit/Write/NotebookEdit/MultiEdit tool call proceeds without explicit bypass.
+
+**Claim semantics:**
+- `claim.sh <path>` resolves to absolute path, sha256 keys a file in `~/.claude/bus/claims/<sha>`.
+- If the path is already claimed by another live session: `{ok:false, reason:"already_claimed"}`, exit 1.
+- Idempotent: claiming your own already-claimed path refreshes `ts` and returns `{ok:true, refreshed:true}`.
+- Dead-session claims (kill -0 fails) are auto-expired and taken over.
+- Claim file has 6 required fields: `path`, `sha`, `session_id`, `name`, `ts`, `host`.
+
+**Release semantics:**
+- `release.sh <path>` removes the claim. No-op if not claimed.
+- `release.sh --all` releases all own claims. Called automatically on `/radio stop` via leave.sh.
+- `release.sh <path> --force` releases even a foreign claim (emergency; broadcasts).
+
+**Hook enforcement:**
+- `~/.claude/hooks/radio_claim_guard.py` fires on PreToolUse for `Edit`, `Write`, `NotebookEdit`, `MultiEdit`.
+- Reads `BUS_DIR/claims/<sha>` for the target file_path; blocks if claimed by another live session.
+- Fast-exit: if `~/.claude/bus/claims/` is empty or missing, exits in <1ms (zero overhead).
+- Bypass: set `RADIO_CLAIM_BYPASS=1` in env — hook allows with stderr warning.
+- Stale claims (dead PID) are swept on read by both hook and `claims_list.sh`.
+
+**Stale sweep:** `claims_list.sh` auto-removes claims from dead sessions older than 1 hour.
+
+**Step 5 dispatch for claim verbs:**
+```bash
+# /radio claim <path>
+bash ~/.claude/skills/bus/scripts/claim.sh "$PATH_ARG"
+
+# /radio release <path>  OR  /radio release --all
+bash ~/.claude/skills/bus/scripts/release.sh "$PATH_ARG"   # or --all
+
+# /radio claims  [--json]
+bash ~/.claude/skills/bus/scripts/claims_list.sh
+```
+
 ## v1 decommission status
 
 v1 hook decommissioned 2026-04-30 (S8). `bus_reminder.py` renamed `.disabled`. `settings.json` UserPromptSubmit hook entry removed (backup at `~/.claude/settings.json.bak.s8.*`). v1 SKILL.md preserved at `SKILL.md.v1-backup`. Re-enable: `mv ~/.claude/hooks/bus_reminder.py{.disabled,}` + restore settings.json from latest `.bak.s8.*`.
