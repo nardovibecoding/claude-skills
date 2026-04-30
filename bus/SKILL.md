@@ -39,9 +39,13 @@ Then run the same handler. Do not deprecate-warn beyond that one line.
 When a channel push arrives, the meta block carries `mode`. The model running this session reads SKILL.md (this file) and applies the rule for the inbound mode:
 
 - **`mode=notify`** — display the message; respond with ≤1 line ack ("noted from B") and **do not take action**. No bash, no tools, no follow-up question. The sender chose `tell`/`all` precisely so the recipient does NOT chain work.
-- **`mode=ask`** — treat as if the user just asked the question. Respond fully. After the response, auto-relay back to sender via `/radio reply` (use `BUS_IN_REPLY_TO=<msg_id>` and target=sender's `from_session_id`).
+- **`mode=ask`** — when you receive a `<channel source='bus' mode='ask' from='<X>' msg_id='<id>'>` event, treat it as if the user just asked the question. Produce your full answer as your normal turn output. Then immediately invoke:
+  ```bash
+  BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts reply <X> <id> "<your-answer>"
+  ```
+  This relays your answer back to sender A's inbox. The relay call is mandatory — without it, A never receives your response. After sending, do NOT chain any further replies on your own initiative.
 - **`mode=consensus`** — follow the 3-round consensus protocol below. One vote per round; hard cap 3; 75% threshold.
-- **`mode=reply`** — display the reply; update context. **Do not chain a counter-reply** unless new information genuinely requires it (anti-loop).
+- **`mode=reply`** — when you receive `<channel source='bus' mode='reply' from='<X>' in_reply_to='<id>'>`, display the reply and update your context. **Do not call `send.ts reply` again** (anti-loop rule). The conversation ends here unless the user explicitly asks you to follow up.
 
 ## Anti-loop discipline
 
