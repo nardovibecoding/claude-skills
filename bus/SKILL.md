@@ -94,35 +94,26 @@ Reuse:
 SID=$CLAUDE_PID
 ```
 
-## Step 2 — Assign name A→Z
+## Step 2 — Assign name A→Z (+ write sentinel) via `join.sh`
 
-Atomic critical section via `flock`:
+Atomic name pick + sentinel write are bundled into `scripts/join.sh`. Locking primitive is `mkdir`-as-lock (atomic on POSIX); `flock(1)` is absent on macOS Bash 3.2 by default. Critical section runs in <50ms typical.
 
 ```bash
-mkdir -p ~/.claude/bus
-NAME=$(
-  ( flock 9
-    # Dedupe by name, latest ts within 60s.
-    used=$(jq -s 'group_by(.name) | map(max_by(.ts)) |
-                  map(select(.ts >= (now - 60))) | map(.name) | .[]' \
-                  ~/.claude/bus/registry.jsonl 2>/dev/null | tr -d '"')
-    for L in A B C D E F G H I J K L M N O P Q R S T U V W X Y Z; do
-      echo "$used" | grep -qx "$L" || { echo "$L"; break; }
-    done
-  ) 9>~/.claude/bus/registry.lock
-)
-[ -z "$NAME" ] && NAME=AA   # A-Z exhausted, fallback
-jq -cn --arg n "$NAME" --arg sid "$SID" --argjson ts $(date +%s) \
-  '{name:$n, session_id:$sid, ts:$ts}' >> ~/.claude/bus/registry.jsonl
+# Optional: BUS_NAME=A forces a specific name (rejected if taken).
+RESP=$(bash ~/.claude/skills/bus/scripts/join.sh)
+echo "$RESP" | jq -e '.ok == true' >/dev/null || {
+  REASON=$(echo "$RESP" | jq -r '.reason')
+  echo "[radio] join failed: $REASON" >&2
+  exit 1
+}
+NAME=$(echo "$RESP" | jq -r '.name')
+SID=$(echo "$RESP" | jq -r '.session_id')
 echo "Joined as **$NAME**"
 ```
 
-## Step 3 — Write opt-in sentinel
+`join.sh` does, inside the critical section: stale-sentinel sweep → read+dedupe registry (60s liveness window) → pick A..Z (fallback AA..AZ) → append registry entry → write `~/.claude/bus/opted-in/<sid>`. Validates `BUS_NAME` against `^[A-Z]+$` (reject specials/injection); auto-uppercases lowercase input.
 
-```bash
-mkdir -p ~/.claude/bus/opted-in
-echo "joined $(date -u +%FT%TZ) name=$NAME" > ~/.claude/bus/opted-in/$SID
-```
+## Step 3 — Sentinel handshake (already done by Step 2)
 
 The plugin reads this **once on startup**. If you joined after `claude` started without prior opt-in, the plugin is already idle (zero CPU, no tails) — see § Plugin lifecycle.
 
