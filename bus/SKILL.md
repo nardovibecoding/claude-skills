@@ -61,35 +61,26 @@ While the sentinel `~/.claude/bus/opted-in/<sessionId>` exists, broadcast on the
 
 Format: `/radio all "<1-line>"` with leading kind tag, e.g. `/radio all "[milestone] S4 landed"`.
 
-## Step 0 — Pre-flight (run on every /radio invocation)
+## Step 0 — Pre-flight (every /radio invocation)
 
 ```bash
-# 0a. Channel plugin loaded? Iron Law.
-PARENT_PID=$(ps -p $$ -o ppid= | tr -d ' ')
-CLAUDE_PID=""
-P=$PARENT_PID
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
-  CMD=$(ps -p $P -o command= 2>/dev/null | awk '{print $1}')
-  BASE="${CMD##*/}"
+# 0a. Resolve claude ancestor PID + verify --channels plugin:bus@local.
+P=$(ps -p $$ -o ppid= | tr -d ' '); CLAUDE_PID=""
+for _ in $(seq 1 16); do
+  CMD=$(ps -p $P -o command= 2>/dev/null | awk '{print $1}'); BASE="${CMD##*/}"
   if [ "$BASE" = "claude" ]; then CLAUDE_PID=$P; break; fi
-  P=$(ps -p $P -o ppid= 2>/dev/null | tr -d ' ')
-  [ -z "$P" ] || [ "$P" = "1" ] && break
+  P=$(ps -p $P -o ppid= 2>/dev/null | tr -d ' '); [ -z "$P" ] || [ "$P" = "1" ] && break
 done
 [ -z "$CLAUDE_PID" ] && { echo "[radio] cannot locate claude ancestor PID"; exit 1; }
-ARGS=$(ps -p $CLAUDE_PID -o command=)
-echo "$ARGS" | grep -q -- "--channels[= ][^ ]*plugin:bus@local" || {
-  cat <<EOF >&2
-[radio] Channel plugin:bus@local not loaded.
-Re-run install_alias.sh or restart claude with --channels plugin:bus@local.
-EOF
+ps -p $CLAUDE_PID -o command= | grep -q -- "--channels[= ][^ ]*plugin:bus@local" || {
+  echo "[radio] Channel plugin:bus@local not loaded. Re-run install_alias.sh or restart claude with --channels plugin:bus@local." >&2
   exit 1
 }
 
 # 0b. Sweep stale sentinels (dead PIDs).
 for f in ~/.claude/bus/opted-in/*; do
   [ -f "$f" ] || continue
-  pid=$(basename "$f")
-  kill -0 "$pid" 2>/dev/null || rm -f "$f"
+  pid=$(basename "$f"); kill -0 "$pid" 2>/dev/null || rm -f "$f"
 done
 ```
 
