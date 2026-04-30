@@ -38,6 +38,35 @@ function validateEnvelope(env: BusEnvelope): void {
   if (!BUS_MODES.has(env.mode)) {
     throw new TypeError(`invalid mode: ${env.mode}`);
   }
+  // Consensus-specific validation.
+  if (env.mode === "consensus") {
+    // All three consensus fields required when mode=consensus.
+    for (const key of CONSENSUS_REQUIRED_KEYS) {
+      if (env[key] === undefined || env[key] === null) {
+        throw new TypeError(`mode=consensus requires field: ${key}`);
+      }
+    }
+    if (typeof env.round !== "number" || env.round < 1 || env.round > 3) {
+      throw new TypeError(`consensus round must be 1, 2, or 3; got: ${env.round}`);
+    }
+    if (!CONSENSUS_KINDS.has(env.kind!)) {
+      throw new TypeError(`invalid consensus kind: ${env.kind}`);
+    }
+    if (typeof env.consensus_id !== "string" || env.consensus_id.length === 0) {
+      throw new TypeError("consensus_id must be a non-empty string");
+    }
+  } else {
+    // Consensus fields forbidden on non-consensus modes.
+    if (env.round !== undefined) {
+      throw new TypeError(`round field only valid for mode=consensus; got mode=${env.mode}`);
+    }
+    if (env.kind !== undefined) {
+      throw new TypeError(`kind field only valid for mode=consensus; got mode=${env.mode}`);
+    }
+    if (env.consensus_id !== undefined) {
+      throw new TypeError(`consensus_id field only valid for mode=consensus; got mode=${env.mode}`);
+    }
+  }
 }
 
 function validateSessionId(sid: string): void {
