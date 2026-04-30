@@ -21,6 +21,10 @@ Lets multiple Claude Code sessions on this machine talk. One session opts in (`/
 | `/radio all "msg"` | notify | broadcast to every joined peer | `/radio all "shipped X"` |
 | `/radio consensus <q>` | consensus | 3-round vote, 75% threshold, 60s/round | `/radio consensus "pg or mysql?"` |
 | `/radio reply <name> <msg_id> "msg"` | reply | send reply back to named peer; links to original by msg_id | `/radio reply A 11111-999 "done"` |
+| `/radio claim <path>` | — | claim a file/dir; block other sessions from editing it | `/radio claim ~/project/foo.ts` |
+| `/radio release <path>` | — | release own claim; broadcast unlock | `/radio release ~/project/foo.ts` |
+| `/radio release --all` | — | release all own claims (called automatically on leave) | `/radio release --all` |
+| `/radio claims` | — | list active claims with ages; sweep dead-session claims | `/radio claims` |
 | `@A msg` | notify | syntax alias for `/radio tell A "msg"` | `@A heads up` |
 | `@all msg` | notify | syntax alias for `/radio all "msg"` | `@all going AFK` |
 
