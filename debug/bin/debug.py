@@ -2818,7 +2818,7 @@ def cmd_race(argv: list[str]) -> int:
     feature = argv[0]
     flags = [a for a in argv[1:] if a.startswith("--")]
     dry_run = "--dry-run" in flags
-    remote_host = next((f.split("=", 1)[1] for f in flags if f.startswith("--check-systemd-on=")), None)
+    _remote_host = next((f.split("=", 1)[1] for f in flags if f.startswith("--check-systemd-on=")), None)  # reserved for future use; surfaced by --check-systemd-on=<host>
 
     print(f"# /debug race — {feature}")
     print()
