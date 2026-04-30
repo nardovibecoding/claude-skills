@@ -2927,6 +2927,238 @@ def cmd_race(argv: list[str]) -> int:
     return 0 if verdict == "race_free" else 1
 
 
+def cmd_critic(argv: list[str]) -> int:
+    """
+    Critic mode — adversarial 3-agent review (Reviewer / Critic / Lead).
+
+    Iron Law: cmd_critic is dispatcher only. LLM calls happen in
+    phases/critic.md orchestration. Adding `import anthropic` or `Agent(`
+    here breaks the rule-based-verb invariant (CLAUDE.md "Rule-based > LLM
+    for local classifiers"). CI grep test:
+      grep -c "import anthropic\\|Agent(" debug.py  →  must be 0
+
+    Inputs: argv = [<target>] [--quick] [--run-id=<X>] [--diff]
+      <target> resolution (P2C2):
+        - existing file path  → single-file target
+        - existing directory  → top-20 files by line count, skipping fixtures
+        - "HEAD~N..HEAD"      → diff target (git diff range)
+        - "<host>:<feature>"  → pipeline_graph.json lookup
+        - --diff              → equivalent to "git diff --staged --name-only"
+
+    Side effects (deterministic only):
+      1. mkdir ~/.ship/debug-critic-verb/state/<run-id>/
+      2. read target files (cap 20), build {path, sha256, lines, content}
+      3. load _lib/critic_lenses.json, compute lenses_active per file_type_skip
+      4. write context.json bundle to that dir
+      5. print exactly: "READY: <abs-path-to-context.json>"
+
+    Hand-off: in-session assistant reads stdout, follows phases/critic.md.
+    """
+    if not argv or argv[0] in ("-h", "--help"):
+        print("usage: debug.py critic <target> [--quick] [--run-id=<X>] [--diff]",
+              file=sys.stderr)
+        print("  <target>: file path | directory | 'HEAD~N..HEAD' | '<host>:<feature>'",
+              file=sys.stderr)
+        print("  --quick:  skip Critic+Lead, Reviewer output is final", file=sys.stderr)
+        print("  --diff:   target = git diff --staged --name-only", file=sys.stderr)
+        return 2
+
+    flags = [a for a in argv if a.startswith("--")]
+    positional = [a for a in argv if not a.startswith("--")]
+    quick_mode = "--quick" in flags
+    diff_mode = "--diff" in flags
+    run_id_override = next(
+        (f.split("=", 1)[1] for f in flags if f.startswith("--run-id=")), None
+    )
+
+    target = positional[0] if positional else ("--diff" if diff_mode else "")
+    if not target and not diff_mode:
+        print("PREMISE_FAILURE: no <target> given", file=sys.stderr)
+        return 2
+
+    # Resolve target → file list
+    target_files: list[dict] = []
+    target_kind = "unknown"
+    SKIP_DIR_RE = re.compile(r"(node_modules|__pycache__|\.git|\.venv|dist|build|fixtures?)")
+    SKIP_FILE_RE = re.compile(r"\.(test|spec)\.(ts|js|tsx|jsx|py)$")
+
+    def _read_file_safe(p: Path, max_bytes: int = 60000) -> dict | None:
+        try:
+            raw = p.read_bytes()
+        except Exception:
+            return None
+        truncated = False
+        if len(raw) > max_bytes:
+            raw = raw[:max_bytes]
+            truncated = True
+        try:
+            content = raw.decode("utf-8", errors="replace")
+        except Exception:
+            return None
+        return {
+            "path": str(p),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "lines": content.count("\n") + 1,
+            "content": content,
+            "truncated": truncated,
+        }
+
+    if diff_mode:
+        target_kind = "diff"
+        try:
+            out = subprocess.run(
+                ["git", "diff", "--staged", "--name-only"],
+                capture_output=True, text=True, check=True,
+            )
+            paths = [Path(line.strip()) for line in out.stdout.splitlines() if line.strip()]
+        except Exception as e:
+            print(f"PREMISE_FAILURE: git diff failed: {e}", file=sys.stderr)
+            return 2
+        for p in paths[:20]:
+            d = _read_file_safe(p) if p.exists() else None
+            if d:
+                target_files.append(d)
+    elif re.match(r"^HEAD~?\d*\.\.HEAD~?\d*$", target) or re.match(r"^[a-f0-9]{6,40}\.\.[a-f0-9]{6,40}$", target):
+        target_kind = "diff"
+        try:
+            out = subprocess.run(
+                ["git", "diff", target, "--name-only"],
+                capture_output=True, text=True, check=True,
+            )
+            paths = [Path(line.strip()) for line in out.stdout.splitlines() if line.strip()]
+        except Exception as e:
+            print(f"PREMISE_FAILURE: git diff {target} failed: {e}", file=sys.stderr)
+            return 2
+        for p in paths[:20]:
+            d = _read_file_safe(p) if p.exists() else None
+            if d:
+                target_files.append(d)
+    elif ":" in target and "/" not in target.split(":", 1)[0]:
+        # host:feature form — pipeline_graph.json lookup
+        target_kind = "host-feature"
+        host, feature = target.split(":", 1)
+        pg_path = META / "pipeline_graph.json"
+        if not pg_path.exists():
+            print(f"PREMISE_FAILURE: pipeline_graph.json missing at {pg_path}", file=sys.stderr)
+            return 2
+        try:
+            pg = json.loads(pg_path.read_text())
+        except Exception as e:
+            print(f"PREMISE_FAILURE: pipeline_graph.json parse: {e}", file=sys.stderr)
+            return 2
+        # Best-effort: find feature node, collect referenced files
+        files_found: list[Path] = []
+        for node in (pg.get("nodes") or pg.get("features") or []):
+            name = node.get("name") or node.get("id") or ""
+            if feature.lower() in name.lower():
+                for fp in (node.get("files") or node.get("paths") or []):
+                    p = Path(os.path.expanduser(fp))
+                    if p.exists():
+                        files_found.append(p)
+        for p in sorted(files_found, key=lambda q: -q.stat().st_size if q.exists() else 0)[:20]:
+            d = _read_file_safe(p)
+            if d:
+                target_files.append(d)
+        if not target_files:
+            print(f"WARNING: no files resolved for {host}:{feature}", file=sys.stderr)
+    else:
+        p = Path(os.path.expanduser(target))
+        if p.is_file():
+            target_kind = "file"
+            d = _read_file_safe(p)
+            if d:
+                target_files.append(d)
+        elif p.is_dir():
+            target_kind = "directory"
+            candidates: list[tuple[int, Path]] = []
+            for root, dirs, files in os.walk(p):
+                # in-place prune skip dirs
+                dirs[:] = [d for d in dirs if not SKIP_DIR_RE.search(d)]
+                for fn in files:
+                    if SKIP_FILE_RE.search(fn):
+                        continue
+                    fp = Path(root) / fn
+                    try:
+                        n = sum(1 for _ in fp.open("rb"))
+                    except Exception:
+                        continue
+                    candidates.append((n, fp))
+            candidates.sort(reverse=True)
+            for _, fp in candidates[:20]:
+                d = _read_file_safe(fp)
+                if d:
+                    target_files.append(d)
+        else:
+            print(f"PREMISE_FAILURE: target not found: {target}", file=sys.stderr)
+            return 2
+
+    if not target_files:
+        print(f"PREMISE_FAILURE: no readable files for target {target}", file=sys.stderr)
+        return 2
+
+    # Load lens taxonomy
+    lenses_path = Path(__file__).parent.parent / "_lib" / "critic_lenses.json"
+    if not lenses_path.exists():
+        print(f"PREMISE_FAILURE: critic_lenses.json missing at {lenses_path}", file=sys.stderr)
+        return 2
+    try:
+        lenses_doc = json.loads(lenses_path.read_text())
+    except Exception as e:
+        print(f"PREMISE_FAILURE: critic_lenses.json parse: {e}", file=sys.stderr)
+        return 2
+
+    # Compute lenses_active: union of lenses that survive file_type_skip across files
+    extensions = {Path(f["path"]).suffix.lower() for f in target_files}
+    lens_skips: dict[str, list[str]] = {}
+    lenses_active: list[str] = []
+    for lens in lenses_doc.get("lenses", []):
+        lid = lens.get("id")
+        skip_exts = set(lens.get("file_type_skip", []))
+        # Lens skipped only when ALL files match skip_exts (otherwise applies to non-skipped subset)
+        if skip_exts and extensions.issubset(skip_exts):
+            for f in target_files:
+                lens_skips.setdefault(f["path"], []).append(lid)
+            continue
+        lenses_active.append(lid)
+        # per-file partial skips
+        for f in target_files:
+            ext = Path(f["path"]).suffix.lower()
+            if ext in skip_exts:
+                lens_skips.setdefault(f["path"], []).append(lid)
+
+    # Compose run_id
+    if run_id_override:
+        run_id = run_id_override
+    else:
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+        # short slug from target
+        raw_slug = re.sub(r"[^A-Za-z0-9]+", "-", target or "diff")[:24].strip("-").lower()
+        run_id = f"{ts}-{raw_slug or 'run'}"
+
+    state_dir = SHIP_ROOT / "debug-critic-verb" / "state" / run_id
+    state_dir.mkdir(parents=True, exist_ok=True)
+
+    bundle = {
+        "run_id": run_id,
+        "target": target,
+        "target_kind": target_kind,
+        "target_files": target_files,
+        "lenses_active": lenses_active,
+        "lens_skips": lens_skips,
+        "quick_mode": quick_mode,
+        "ts_unix": int(time.time()),
+        "lenses_doc_path": str(lenses_path),
+        "brief_template_path": str(
+            Path(__file__).parent.parent / "_lib" / "critic_brief_template.md"
+        ),
+    }
+    context_path = state_dir / "context.json"
+    context_path.write_text(json.dumps(bundle, indent=2))
+
+    print(f"READY: {context_path}")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2 or argv[1] in ("-h", "--help", "help"):
         return cmd_help()
@@ -2949,6 +3181,8 @@ def main(argv: list[str]) -> int:
         return cmd_wedge(argv[2:])
     if verb == "scan":
         return cmd_scan(argv[2:])
+    if verb == "critic":
+        return cmd_critic(argv[2:])
     print(f"unknown verb: {verb}", file=sys.stderr)
     return 2
 
