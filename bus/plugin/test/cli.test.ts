@@ -153,7 +153,6 @@ describe("send.ts CLI", () => {
     const busDir = path.join(tmpHome, ".claude", "bus");
     const registry = path.join(busDir, "registry.jsonl");
     const ts = new Date().toISOString();
-    const { writeFileSync } = await import("node:fs");
     writeFileSync(registry, JSON.stringify({ name: "A", session_id: "11111", ts }) + "\n");
 
     const origMsgId = "99999-111";
