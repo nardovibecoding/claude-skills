@@ -11,5 +11,5 @@
     "types": ["bun-types"],
     "lib": ["ES2022"]
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": ["src/**/*", "test/**/*", "server.ts"]
 }
