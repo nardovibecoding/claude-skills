@@ -1,0 +1,6 @@
+{
+  "name": "bus",
+  "description": "Inter-session message bus for Claude Code — channel plugin (plugin:bus@local). See ~/.claude/skills/bus/.",
+  "version": "0.1.0",
+  "keywords": ["bus", "channel", "mcp", "inter-session"]
+}
