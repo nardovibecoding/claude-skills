@@ -145,6 +145,24 @@ Step 0.5 (kernel-capture) arms `bin/wedge-capture.sh` against the live PID — c
 
 Verdict: `wedge_eliminated | wedge_persists | wedge_shifted_to_<wchan> | inconclusive`. Flags: `--capture-only` (arm trace and exit, return path to log), `--read-trace=<file>` (skip Step 0.5, parse existing trace).
 
+### `/debug critic <target>`
+Critic mode — adversarial 3-agent review (Reviewer / Critic / Lead). On-demand only; never auto-fires. Loads `phases/critic.md`. Replaces standalone `/critic` skill (retired 2026-04-30).
+
+`<target>` syntax:
+- file path (e.g. `~/.claude/skills/debug/bin/debug.py`)
+- directory (top 20 files by line count, skipping `node_modules`/`__pycache__`/test fixtures)
+- commit range (e.g. `HEAD~3..HEAD`)
+- `<host>:<feature>` (pipeline_graph.json lookup)
+- `--diff` (uses `git diff --staged --name-only`)
+
+Three isolated sub-agents fire in sequence: Reviewer ($1000-incentive prompt; outputs findings tagged by lens + severity), Critic (verdicts each finding with 2x false-dismissal penalty), Lead (symmetric +1/-1 arbiter). Output: 3-section markdown table (Confirmed / Low-confidence / Dismissed-collapsed) + ledger entry with `mode: critic`.
+
+Verdict (top-level): `findings_present | clean | inconclusive`. Sibling JSON at `~/NardoWorld/critic-findings/<R-NNNN>.json` with full findings array.
+
+Flags: `--quick` (skip Critic+Lead, single-agent fallback ~1/3 cost), `--diff` (target = git staged diff), `--run-id=<X>` (override auto run-id).
+
+`bin/debug.py critic` is dispatcher only — no LLM calls in Python. The 3-agent orchestration lives in `phases/critic.md` (in-session execution).
+
 ### `/debug race <feature>`
 Race-condition mode — feature deploys "successfully" but a producer/consumer schedule mismatch silently drops data. Detected after the bigd 6-daemon ship (Apr 27 2026): bundle assembler ran 4-15s before all daemons finished, capturing 8/18 instead of 18/18. Pure timing race, not a daemon bug.
 
