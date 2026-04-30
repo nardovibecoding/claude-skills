@@ -186,6 +186,7 @@ function shutdown(sig: string): void {
   for (const t of tails) {
     try { t.stop(); } catch { /* ignore */ }
   }
+  try { _unlinkPidSync(PLUGIN_PID_FILE); } catch { /* ignore */ }
   void mcp.close().finally(() => process.exit(0));
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
