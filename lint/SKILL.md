@@ -42,6 +42,7 @@ Always run **Capacity monitoring** at end (table below — small enough to keep 
 - `references/phase-7-code.md` — code-redundancy scan (Phase-N prototype markers, superseded/replaced)
 - `references/phase-8-claudemd.md` — CLAUDE.md classify-and-trim (folded from `claudemd-maintenance`, 2026-04-30)
 - `references/phase-9-data.md` — bot-data + SSOT-log hygiene (cross-platform pollution, dead deprecated, oversized, schema drift, writer-gap)
+- `references/phase-10-system.md` — system-drift scan across hooks/agents/LaunchAgents/scripts (.bak cruft, zombie .disabled, orphans, rescinded-but-wired, mergeable stanzas, dot-vs-dash collisions; dispatcher-routing-aware)
 - `references/unattended.md` — cron-safe variant: writes memos instead of prompting, auto-fix safe changes, git commit at end
 
 ## Capacity monitoring (report on every run)
