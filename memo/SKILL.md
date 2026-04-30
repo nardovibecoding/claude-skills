@@ -2,8 +2,8 @@
 name: memo
 description: |
   Read + write local memo store (TG admin_bot + terminal scribble; email channel S5).
-  Bare `/memo` shows the 5 newest. `/memo #tag` filters by tag. `/memo search <kw>` full-text searches memo bodies (case-insensitive substring). `/memo --since 7d` shows a 3-bucket diff (NEW / RECURRING / RESOLVED) over the window. `/memo <body>` scribbles a new terminal memo (parses #tag tokens).
-  Triggers: "/memo", "memo this is a note #idea", "/memo brainstorm dashboard #idea", "/memo #drift", "/memo #idea", "/memo #stale-ref", "/memo #followup", "/memo search foo", "/memo search rename refs", "/memo --since 7d", "/memo --since 30d", "last memo", "check memo", "did my memo save", "show memos", "recheck memo".
+  Bare `/memo` shows the 5 newest. `/memo #tag` filters by tag. `/memo search <kw>` full-text searches memo bodies (case-insensitive substring). `/memo --since 7d` shows a 3-bucket diff (NEW / RECURRING / RESOLVED) over the window. `/memo <body>` scribbles a new terminal memo (parses #tag tokens). `/memo --source notebooklm <question>` queries a NotebookLM notebook via browser automation (folded from retired `/notebooklm` 2026-04-30); `/memo --source notebooklm --manage <add|list>` manages the notebook library. URL paste of `https://notebooklm.google.com/...` auto-routes to this verb.
+  Triggers: "/memo", "memo this is a note #idea", "/memo brainstorm dashboard #idea", "/memo #drift", "/memo #idea", "/memo #stale-ref", "/memo #followup", "/memo search foo", "/memo search rename refs", "/memo --since 7d", "/memo --since 30d", "/memo --source notebooklm <q>", "ask my notebooklm what foo is", "notebooklm.google.com URL", "last memo", "check memo", "did my memo save", "show memos", "recheck memo".
 user_invocable: true
 ---
 
