@@ -49,8 +49,8 @@
 
 ## In-flight v1 sessions at cutover
 
-- A pre-cutover session that ran `/bus join` is still polling its v1 hook until you `/bus stop` it OR the v1 hook moves to `.disabled` (S8).
-- After S8 ships, NEW `/bus join` invocations no longer get hook injection — but CLI `tell`/`all` writes still land in the spool.
+- The v1 hook is already decommissioned (S8 done). A session that ran `/bus join` before this ship will no longer receive new hook injections — its in-process polling state ends at the next compact / restart.
+- CLI `tell` / `all` writes still land in `~/.claude/bus/all.jsonl` and `~/.claude/bus/inbox/<sid>.jsonl` regardless.
 - Recommended path: `/bus stop` in any active session, exit, open a fresh terminal, run `/radio join`.
 
 ---
