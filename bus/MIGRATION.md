@@ -59,7 +59,7 @@
 
 1. Done — alias appender ran via `bash ~/.claude/skills/bus/scripts/install_alias.sh` (2026-04-30 ~14:45 HKT). Confirmed in `~/.zshrc:77` (`--channels plugin:bus@local` injected; pre-edit backup at `~/.zshrc.bak.1777532508`).
 2. Done — session_id probe ran (`~/.claude/skills/bus/scripts/probe_session_id.sh`); `CLAUDE_SESSION_ID` not exported by harness, PID-walk-up locked in as resolution path.
-3. Pending — v1 hook decommission (S8). `~/.claude/hooks/bus_reminder.py` still active; `settings.json` still references it (line ~590). Pre-S8 settings backup already staged at `~/.claude/settings.json.bak.s8.1777537760`.
+3. Done — v1 hook decommissioned (S8). `~/.claude/hooks/bus_reminder.py.disabled` archived; `settings.json` no longer references it. Pre-S8 settings backup at `~/.claude/settings.json.bak.s8.1777537760`.
 4. Pending — open new claude sessions to fully exercise v2. Pre-alias sessions can use the CLI but will not receive channel push.
 
 ---
