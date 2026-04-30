@@ -126,7 +126,7 @@
 
 ## Rollback plan (if v2 turns out broken)
 
-- Restore v1 hook: `mv ~/.claude/hooks/bus_reminder.py.disabled ~/.claude/hooks/bus_reminder.py` (only needed once S8 has disabled it; today the .py is still live).
+- Restore v1 hook: `mv ~/.claude/hooks/bus_reminder.py.disabled ~/.claude/hooks/bus_reminder.py`.
 - Restore settings.json: `cp ~/.claude/settings.json.bak.s8.1777537760 ~/.claude/settings.json` (pre-S8 snapshot).
 - Restore SKILL.md: `cp ~/.claude/skills/bus/SKILL.md.v1-backup ~/.claude/skills/bus/SKILL.md`.
 - Remove `--channels` flag from `~/.zshrc:77` (or restore from `~/.zshrc.bak.1777532508`, the S0 snapshot).
