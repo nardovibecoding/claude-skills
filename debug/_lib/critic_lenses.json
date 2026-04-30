@@ -1,0 +1,68 @@
+{
+  "version": "1.0",
+  "source": "Adapted from review-team [secondary-citation, concept-only]: https://github.com/ronneylira/review-team. Dropped Testing (pre-merge concern, /debug critic fires on live) and Complexity (subjective, merged into correctness). 2026-04-30 initial taxonomy.",
+  "lenses": [
+    {
+      "id": "correctness",
+      "display": "Correctness",
+      "prompt_fragment": "Logic bugs, off-by-one, wrong conditions, type mismatches, null/undefined handling, complexity-induced correctness drift.",
+      "file_type_skip": [],
+      "applies": "all"
+    },
+    {
+      "id": "security",
+      "display": "Security",
+      "prompt_fragment": "Auth bypass, injection (SQL/shell/template), secrets in plaintext, exposed APIs, missing rate limits, unsafe deserialization, path traversal.",
+      "file_type_skip": [],
+      "applies_when_target_has": ["http", "ws://", "apiKey", "token", "auth", "secret", "password"]
+    },
+    {
+      "id": "error-handling",
+      "display": "Error handling",
+      "prompt_fragment": "Missing try/catch, unhandled promise rejections, silent failures, swallowed exceptions, error paths not returning to caller.",
+      "file_type_skip": [],
+      "applies": "all"
+    },
+    {
+      "id": "performance",
+      "display": "Performance",
+      "prompt_fragment": "Hot-loop sync I/O, unbounded growth (Maps/arrays not pruned), blocking calls inside fast loops, N+1 patterns, missing debounce/coalesce on writes.",
+      "file_type_skip": [".md", ".txt"],
+      "applies": "code-and-config"
+    },
+    {
+      "id": "concurrency",
+      "display": "Concurrency",
+      "prompt_fragment": "Race conditions, shared-state without locks, async fan-out without bounded parallelism, missing isolation, ordering assumptions.",
+      "file_type_skip": [".md", ".css", ".html"],
+      "applies_when_target_has": ["asyncio", "threading", "subprocess", "Promise", "async", "setInterval", "setTimeout"]
+    },
+    {
+      "id": "dead-code",
+      "display": "Dead code",
+      "prompt_fragment": "Unreferenced functions, orphan hooks, stale imports, branches that can never fire, unused config keys.",
+      "file_type_skip": [".md", ".txt", ".json", ".yaml", ".yml"],
+      "applies": "code"
+    },
+    {
+      "id": "stale-config",
+      "display": "Stale config",
+      "prompt_fragment": "Outdated flags, wrong env vars, expired keys, deprecated API endpoints, references to retired services or files.",
+      "file_type_skip": [],
+      "applies": "all"
+    },
+    {
+      "id": "observability",
+      "display": "Observability",
+      "prompt_fragment": "Missing logs at decision points, silent failures with no alert path, no heartbeat, errors logged but not surfaced.",
+      "file_type_skip": [],
+      "applies": "all"
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-04-30",
+      "change": "Initial 8-lens taxonomy derived from review-team [secondary-citation]; dropped Testing + Complexity per Phase 1 SPEC §3 rationale."
+    }
+  ]
+}
