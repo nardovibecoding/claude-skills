@@ -127,7 +127,7 @@ async function main(): Promise<void> {
     msg_id,
     from: busName,
     from_session_id: sid,
-    to: verb === "all" || verb === "consensus" ? "all" : target!,
+    to: verb === "all" || verb === "consensus" || verb === "vote" ? "all" : target!,
     mode,
     ts,
     payload,
