@@ -246,6 +246,8 @@ async function main(): Promise<void> {
   }
 
   // --- tell / ask: targeted ---
+  // TypeScript: after filtering vote/reply/all/consensus above, only tell/ask remain.
+  if (parsed.verb !== "tell" && parsed.verb !== "ask") die(`unhandled verb: ${parsed.verb}`);
   const envelope: BusEnvelope = {
     msg_id,
     from: busName,
