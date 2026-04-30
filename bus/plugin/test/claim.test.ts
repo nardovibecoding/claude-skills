@@ -48,7 +48,7 @@ function runScript(
 }
 
 beforeAll(() => {
-  TMP_DIR = mkdtempSync(join(tmpdir(), "bus-claim-test-"));
+  TMP_DIR = realpathSync(mkdtempSync(join(tmpdir(), "bus-claim-test-")));
   mkdirSync(join(TMP_DIR, "claims"), { recursive: true });
   // Create canary file so realpath succeeds.
   CANARY_FILE = join(TMP_DIR, "canary.txt");
