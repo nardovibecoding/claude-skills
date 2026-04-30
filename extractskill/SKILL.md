@@ -3,7 +3,7 @@ name: extractskill
 description: |
   Evaluate and install community AI skills from GitHub URLs or skill repos.
   Triggers: "extract skill", "evaluate skill", "check this skill", shared skill URL, list of skills to review.
-  NOT FOR: security scanning (use skill-security-auditor), skill cleanup (use lint).
+  NOT FOR: security scanning (use `/upskill audit <path>` — folded from retired `skill-security-auditor` 2026-04-30), skill cleanup (use lint).
   Produces: installed skill or extracted patterns saved to memory.
 user-invocable: true
 ---
