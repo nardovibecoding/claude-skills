@@ -118,12 +118,19 @@ describe("send.ts CLI", () => {
   });
 
   test("T6 consensus verb writes mode=consensus to all.jsonl", () => {
-    const r = run(["consensus", "Postgres or MySQL?"], { BUS_NAME: "A" });
+    const r = run(["consensus", "Postgres or MySQL?"], {
+      BUS_NAME: "A",
+      BUS_ROUND: "1",
+      BUS_KIND: "question",
+      BUS_CONSENSUS_ID: "11111-c-1234567890",
+    });
     expect(r.code).toBe(0);
     const allFile = path.join(tmpHome, ".claude", "bus", "all.jsonl");
     const env = JSON.parse(readFileSync(allFile, "utf8").trim());
     expect(env.mode).toBe("consensus");
     expect(env.to).toBe("all");
+    expect(env.round).toBe(1);
+    expect(env.kind).toBe("question");
   });
 
   test("T7 reply verb with numeric sid writes mode=reply + reply_from + in_reply_to to recipient inbox", () => {
