@@ -78,3 +78,18 @@ bash ~/.claude/skills/upskill/scripts/upskill.sh           # default lens=skills
 bash ~/.claude/skills/upskill/scripts/upskill.sh perf      # perf lens
 bash ~/.claude/skills/upskill/scripts/upskill.sh menu:tools.json  # custom menu
 ```
+
+## Verb dispatcher (added 2026-04-30, skill-consolidation step 19)
+
+| verb | action | underlying file |
+|---|---|---|
+| `/upskill` (bare) | external scout sweep + ROI rank + auto-emit top-1 SPEC | `scripts/upskill.sh` (default lens=skills) |
+| `/upskill scout` / `/upskill <lens>` | alias for bare with lens override | `scripts/upskill.sh <lens>` |
+| `/upskill health` | broken symlinks / stale disabled / stub-only / orphan refs / inline-bloat | `references/health-check.md` (folded from `skill-health-check`, 2026-04-30) |
+| `/upskill audit <path-or-url>` | pre-install security scan, 11+ threat categories | `scripts/skill_security_auditor.py` + `references/security-threat-model.md` (folded from `skill-security-auditor`, 2026-04-30) |
+
+`/upskill audit` invocation:
+```bash
+python3 ~/.claude/skills/upskill/scripts/skill_security_auditor.py <fetched-skill-dir>
+```
+Output: PASS/WARN/FAIL JSON. /extractskill calls this same script path directly (no slash dependency).
