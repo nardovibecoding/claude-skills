@@ -34,17 +34,16 @@ if [ ! -e "$TARGET" ]; then
   echo "[install_alias] created empty $TARGET"
 fi
 
-# Backup
+# Idempotency check FIRST (avoid creating noise backups on no-op runs)
+if grep -q -- "--channels[^[:space:]]*${FLAG}" "$TARGET" 2>/dev/null; then
+  echo "[install_alias] no-op: ${FLAG} already present in $TARGET"
+  exit 0
+fi
+
+# Backup (only when an actual edit will happen)
 TS=$(date +%s)
 BACKUP="${TARGET}.bak.${TS}"
 cp "$TARGET" "$BACKUP"
-
-# Idempotency check on whole file
-if grep -q -- "--channels[^[:space:]]*${FLAG}" "$TARGET" 2>/dev/null; then
-  echo "[install_alias] no-op: ${FLAG} already present in $TARGET"
-  rm "$BACKUP"
-  exit 0
-fi
 
 # Atomic edit via tmpfile
 TMP=$(mktemp "${TARGET}.tmp.XXXXXX")
