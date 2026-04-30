@@ -64,7 +64,7 @@ _on_trap() {
     local vts msg_id
     vts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     msg_id="${BUS_SID}-trap-$(date +%s)"
-    BUS_NAME="$BUS_NAME" bun run --eval "
+    BUS_NAME="$BUS_NAME" bun --eval "
 import { appendBroadcast } from '$WRITER';
 await appendBroadcast({
   msg_id: '$msg_id',
@@ -101,7 +101,7 @@ _broadcast_question() {
   # Escape double-quotes in question for embedding in JS string.
   payload_escaped="${QUESTION//\"/\\\"}"
 
-  BUS_NAME="$BUS_NAME" bun run --eval "
+  BUS_NAME="$BUS_NAME" bun --eval "
 import { appendBroadcast } from '$WRITER';
 await appendBroadcast({
   msg_id: '${msg_id}',
@@ -243,7 +243,7 @@ echo "Broadcasting verdict..."
 VERDICT_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 VERDICT_MSG_ID="${BUS_SID}-v-$(date +%s)"
 
-BUS_NAME="$BUS_NAME" bun run --eval "
+BUS_NAME="$BUS_NAME" bun --eval "
 import { appendBroadcast } from '$WRITER';
 await appendBroadcast({
   msg_id: '${VERDICT_MSG_ID}',
