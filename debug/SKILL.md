@@ -15,6 +15,7 @@ description: |
     /debug leak <feature>           — Leak mode (RSS climb / OOM / heap). "X is leaking / OOM / RSS climb / heap exhausted / memory bloat"; flags --baseline=<file>
     /debug race <feature>           — Race mode (producer-consumer schedule mismatch). "X fires but Y is empty"; flags --check-systemd-on=<host>
     /debug wedge <unit>             — Wedge mode (process in kernel D-state, log rate=0, SIGTERM hangs). "X is wedged / frozen in kernel / D-state"; flags --capture-only --read-trace
+    /debug critic <target>          — Critic mode (3-agent adversarial review: Reviewer / Critic / Lead). "what's wrong with X", "red team X", "find flaws in X"; flags --quick --diff
     /debug list                     — show realize-debt.md ledger
 
   Step 1.5 MINIMISE auto-mode (opt-in, all 3 verbs):
