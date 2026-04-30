@@ -33,6 +33,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import path from "node:path";
 import os from "node:os";
+import { mkdirSync, writeFileSync, unlinkSync as _unlinkPidSync } from "node:fs";
 import { resolveSessionId } from "./src/session.js";
 import { isOptedIn, cleanStaleSentinels } from "./src/sentinel.js";
 import { tailSpool, type SpoolHandle } from "./src/spool.js";
