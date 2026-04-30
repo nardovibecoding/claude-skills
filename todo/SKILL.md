@@ -140,6 +140,44 @@ Cap at 4 bullets, newest first.
 
 ---
 
+## Resolution mode (default ON)
+
+After printing the snapshot + open-loops + promises blocks, in the **same turn**, immediately call `AskUserQuestion` to drive Bernard through the loops 1-by-1. This is the default. Do not wait for Bernard to ask "now solve them".
+
+### Rules
+
+- **One loop per question.** Never batch multiple loops into one AskUserQuestion. Each loop gets its own question with its own option set so Bernard's answer is unambiguous.
+- **Order**: newest-first by default (matches the Open loops listing). If Bernard pre-stated an order ("oldest first" / "tackle hooks ones first"), follow that.
+- **Skip rule**: if Bernard's invocation message explicitly excludes a loop ("except the weekly thing", "skip the cron one"), drop that loop from the queue before the first question.
+- **Question shape**: `header` = ≤12-char tag of the loop topic; `question` = the decision Bernard owes, one sentence, ending in `?`; 2-4 mutually-exclusive options. The harness auto-adds an "Other" option — never include it manually.
+- **Option discipline**: lead with the recommended option, suffix `(Recommended)` on its label. Each option's `description` ≤20 words: states the action and the main tradeoff.
+- **Preview field**: use only when comparing concrete artifacts (file diffs, layouts). Skip for plain decision questions.
+- **One question at a time**: emit exactly one AskUserQuestion call per turn during resolution mode. After Bernard answers, act on the answer (or queue it), then ask the next loop in the next turn.
+- **Acting on answers**: if the chosen option is directly executable (delete file, schedule cron, run a command) and reversible, execute it before asking the next question. If it requires a multi-step ship or is irreversible, log the decision in chat in one line and move on.
+- **Stop conditions**: queue empty → print `All loops resolved.` and stop. Bernard says "stop" / "enough" / "later" / "pause" → print `Pausing — N loops still open.` and stop. Bernard pivots to a new topic mid-resolution → drop resolution mode silently, follow him.
+
+### Question template
+
+```
+question: "<loop topic in plain words> — <what to do>?"
+header: "<≤12 char tag>"
+options:
+  - label: "<verb-led short option> (Recommended)"
+    description: "<action + tradeoff, ≤20 words>"
+  - label: "<alternative>"
+    description: "<action + tradeoff>"
+  - label: "Park"
+    description: "Leave open for later, move to next loop."
+```
+
+Always include a "Park" or equivalent defer option as the last non-Other choice — Bernard often wants to skip without closing the loop.
+
+### Disable
+
+If Bernard says `/todo list-only` (or includes "just list", "no questions", "don't ask", "snapshot only" in the invocation), skip resolution mode and stop after the blocks.
+
+---
+
 ## Persistence
 
 Every successful `/todo` invocation appends one JSONL line to `~/.claude/state/todo-ledger.jsonl`:
