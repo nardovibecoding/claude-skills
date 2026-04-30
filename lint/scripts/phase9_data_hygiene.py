@@ -222,10 +222,14 @@ def scope_bot_data(report: List[str], file_map: Dict[str, str]) -> Dict[str, int
 
 def _ssot_size_and_archives(host: Dict) -> Optional[Dict]:
     """Return {size: int, archives: [(name, mtime)]} or None on failure."""
-    cmd = f"find '{host['ssot_dir']}' -maxdepth 1 -type f -printf '%f\\t%s\\t%T@\\n' 2>/dev/null"
     if host["ssh"]:
+        # remote: shell expands ~ in remote bash
+        cmd = f"find {host['ssot_dir']} -maxdepth 1 -type f -printf '%f\\t%s\\t%T@\\n' 2>/dev/null"
         rc, out, _ = _ssh(host["ssh"], cmd)
     else:
+        # local: expand ~ via Path
+        local_dir = str(Path(host["ssot_dir"]).expanduser())
+        cmd = f"find '{local_dir}' -maxdepth 1 -type f -printf '%f\\t%s\\t%T@\\n' 2>/dev/null"
         rc, out, _ = _run(["bash", "-c", cmd])
     if rc != 0:
         return None
