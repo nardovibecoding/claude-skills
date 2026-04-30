@@ -36,6 +36,8 @@ import {
   appendReply,
 } from "../writer.js";
 import type { BusEnvelope, BusMode } from "../types.js";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 
 type Verb = "tell" | "ask" | "all" | "consensus" | "reply";
 
