@@ -68,47 +68,55 @@ Each loop = one decision Bernard owes the original sub-topic. The bullet should 
 
 ## Output template
 
-With opens:
+With loops:
 ```
 <snapshot prose, ≤3 sentences>
 
-Open:
-- <question 1>
-- <question 2>
-- <question 3>
+Open loops:
+- <topic> — <decision owed>
+- <topic> — <decision owed>
+- <topic> — <decision owed>
 ```
 
-No opens:
+No loops:
 ```
 <snapshot prose, ≤3 sentences>
 
-Open: none.
+Open loops: none.
 ```
 
 ## Examples
 
-Good:
+Good (loops detected from real digressions):
 ```
-Codex migration cleanup — fixed `london_config_guard.py` classification (DROP) across 5 files, shipped p0-manifest + smoke-plan + degrade-decision. Founder folder built at `~/Desktop/Bernard_Survival_Kit/`. next: VibeIsland scan.
+jcode CF 403 debug — diagnosed VPN-IP reputation as cause, filed issue #80 on github.com/1jehuang/jcode. No reply yet (12h). next: wait for upstream or self-patch.
 
-Open:
-- continue eval-strats wire (step 15)?
-- patch xcrawl stale prose now or later?
-- which push pipeline first?
+Open loops:
+- patch jcode source — answered (Rust, ~hrs work, IP-rep fix may be moot); no decision after Bernard said "lets go" then pivoted to issue
+- cron-check on jcode issue — offered weekly schedule; never answered
+- VPN exit alternative — Japan vs residential SOCKS5 raised, no choice made
 ```
 
-Good (1 sentence, no opens):
+Good (1 sentence, no loops):
 ```
 Ghostty 1.3.1 installed via brew cask, Desktop alias placed; awaiting first launch.
 
-Open: none.
+Open loops: none.
 ```
 
-Bad (preamble + offer + answers questions):
+Bad (preamble + offer + decides for Bernard):
 ```
-Here's a snapshot of where we are: we finished installing Ghostty. You had asked about config — I think we should use the dark theme. Want me to set that up?
+Here's a snapshot of where we are: we finished installing Ghostty. You had asked about config — I think dark theme is best. Want me to set that up?
 ```
+
+Bad (lists literal questions instead of digressions):
+```
+Open loops:
+- want me to file the issue?
+- should I check gh later?
+```
+(These were already answered + acted on. Not loops.)
 
 ## Output
 
-Just the snapshot + open block. Nothing before, nothing after.
+Just the snapshot + open-loops block. Nothing before, nothing after.
