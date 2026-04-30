@@ -226,6 +226,16 @@ async function main(): Promise<void> {
     };
     const replyTo = process.env.BUS_IN_REPLY_TO;
     if (replyTo) envelope.in_reply_to = replyTo;
+    // Consensus envelope fields — required by writer when mode=consensus.
+    // Skill provides via env: BUS_ROUND, BUS_KIND, BUS_CONSENSUS_ID.
+    if (parsed.verb === "consensus") {
+      const roundStr = process.env.BUS_ROUND;
+      const kind = process.env.BUS_KIND as "question" | "vote" | "verdict" | undefined;
+      const consensusId = process.env.BUS_CONSENSUS_ID;
+      if (roundStr) envelope.round = Number(roundStr);
+      if (kind) envelope.kind = kind;
+      if (consensusId) envelope.consensus_id = consensusId;
+    }
     try {
       await appendBroadcast(envelope);
     } catch (e) {
