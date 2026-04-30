@@ -78,8 +78,32 @@ function parseArgs(argv: string[]): {
   return { verb, target: argv[1]!, payload: argv[2]! };
 }
 
+function resolveNameToSid(nameOrSid: string): string {
+  // Numeric: pass through immediately.
+  if (/^\d+$/.test(nameOrSid)) return nameOrSid;
+  // Name: call resolve_name.sh.
+  const script = path.resolve(
+    __dirname,
+    "..",
+    "..",
+    "..",
+    "..",
+    "scripts",
+    "resolve_name.sh",
+  );
+  const r = spawnSync("bash", [script, nameOrSid], { encoding: "utf8" });
+  if (r.status !== 0) {
+    die(`recipient_not_found: ${nameOrSid}`);
+  }
+  const sid = r.stdout.trim();
+  if (!sid || !/^\d+$/.test(sid)) {
+    die(`recipient_not_found: ${nameOrSid}`);
+  }
+  return sid;
+}
+
 async function main(): Promise<void> {
-  const { verb, target, payload } = parseArgs(process.argv.slice(2));
+  const { verb, target, inReplyTo, payload } = parseArgs(process.argv.slice(2));
 
   // Resolve sender session_id from process tree (claude PID).
   let sid: string;
