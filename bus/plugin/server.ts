@@ -57,7 +57,6 @@ const sessionId = resolveSessionId();
 log("plugin attached", { session_id: sessionId });
 
 // OI-S4-1: write own pid keyed by sessionId so /radio stop can SIGTERM us.
-import { mkdirSync, writeFileSync, unlinkSync as _unlinkPidSync } from "node:fs";
 const PLUGIN_PID_FILE = path.join(PLUGIN_PID_DIR, sessionId);
 try {
   mkdirSync(PLUGIN_PID_DIR, { recursive: true });
