@@ -21,6 +21,9 @@ if ! _bus_lock_acquire; then
 fi
 trap _bus_lock_release EXIT INT TERM
 
+# Release all own claims before teardown (prevents orphan claim files).
+bash "$SCRIPT_DIR/release.sh" --all 2>/dev/null || true
+
 # SIGTERM plugin if its PID file exists. Read before delete; ignore kill failures.
 PLUGIN_PID_FILE="$BUS_PLUGIN_PID_DIR/$SID"
 if [ -f "$PLUGIN_PID_FILE" ]; then
