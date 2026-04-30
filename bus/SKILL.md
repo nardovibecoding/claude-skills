@@ -143,6 +143,11 @@ BUS_NAME=$NAME BUS_TARGET_SID=$TARGET_SID \
 
 # all / consensus: no target resolution
 BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts <verb> "$PAYLOAD"
+
+# reply: resolve recipient name → sid, then invoke (3-arg form)
+TARGET_SID=$(bash ~/.claude/skills/bus/scripts/resolve_name.sh "$TARGET_NAME")
+[ -z "$TARGET_SID" ] && { echo "[radio] no peer $TARGET_NAME within 60s"; exit 1; }
+BUS_NAME=$NAME bun run ~/.claude/skills/bus/plugin/src/cli/send.ts reply "$TARGET_NAME" "$IN_REPLY_TO_MSG_ID" "$PAYLOAD"
 ```
 
 Syntax aliases: `@A msg` → `tell A "msg"`; `@all msg` → `all "msg"`.
