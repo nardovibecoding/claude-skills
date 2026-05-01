@@ -181,6 +181,56 @@ Why this exists: same incident as RC-9. /s snapshot read "P2 hardened" without v
 
 ---
 
+---
+
+## RC-11 — Discipline Detection (T3.5 — added 2026-05-02)
+
+Runs the structured `detection_runner:` block declared by each discipline cited in the slice's §Discipline Impact `disciplines:` block. BLOCKS phase close on any violation. Implements the auto-grader for the per-slice axis (the bigd daemon-side detector layer is the codebase-wide cousin per `~/.ship/bigd-discipline-detector-mapping/goals/01-spec.md`).
+
+Source: 2026-05-02 ship-discipline-detector-runner slice. Closes the gap between paperwork enforcement (discipline-impact-gate.py) and actual code-level enforcement.
+
+### How it runs
+
+```bash
+python3 ~/.claude/scripts/discipline-detector-runner.py \
+    --slug <slice-slug> \
+    --repo <repo-root> \
+    --scope diff \
+    [--base <sha>] \
+    [--paths <path,path,...>]
+```
+
+Behavior:
+1. Reads §Discipline Impact `disciplines:` from PLAN §6.3 first, falls back to SPEC §5.3, else emits `trivial_tier_no_grading` (advisory).
+2. For each declared D-code:
+   - If artifact contains `[skip-detector: D-X reason=<text>]` marker → log to `~/.claude/scripts/state/detector-skips.jsonl`, mark SKIP.
+   - Else load `detection_runner:` YAML block from `~/.claude/rules/disciplines/<file>.md`.
+   - Missing block → verdict UNRUNNABLE → BLOCK phase close.
+   - Execute per `type:` (grep | shell_command | ssh_command | ts_morph stub).
+   - Compare violations vs `max_violations:` threshold.
+3. Writes `<slice>/state/04-discipline-detection-results.md` (markdown) + JSON to stdout.
+4. Exit 0 = all PASS/SKIP, 1 = any FAIL, 2 = any UNRUNNABLE, 3 = arg/parse error.
+
+### Block semantics
+
+Any FAIL or UNRUNNABLE blocks Phase 4 LAND from closing. Phase author must:
+- Fix the violation (re-execute Phase 3) and re-run RC-11, OR
+- Add `[skip-detector: D-X reason=<rationale>]` to plan/spec for UNRUNNABLE disciplines that lack a `detection_runner:` block (transitional period).
+
+Receipts are appended ONLY for disciplines with verdict PASS in this run. SKIPs are logged to `detector-skips.jsonl` but no D-receipt; they don't count toward ratchet promotion.
+
+### Schema reference
+
+Discipline files house the `detection_runner:` block. See `~/.claude/rules/disciplines/ssot.md` (D1) and `~/.claude/rules/disciplines/lifecycle-pair.md` (D5) for the canonical format. Allowed types: `grep | shell_command | ssh_command | ts_morph`.
+
+`D14` quantitative invariants are OUT OF SCOPE for RC-11 — those are runtime assertions in bot code, not Phase 4 detections.
+
+### Override path
+
+Strict bypass: add `[skip-detector: D-X reason=<text>]` per discipline. Logged to `detector-skips.jsonl`; daemon-side ratchet visibility preserved.
+
+---
+
 ## Application order
 
 For each Phase 4 LAND closure:
@@ -195,6 +245,9 @@ For each Phase 4 LAND closure:
 8. Run RC-6 (cross-repo links) — only if public-repo README change
 9. Run RC-8 (deps) — only if SKILL with declared deps
 10. Run RC-10 (enforcement-cite audit) — runs against `04-land.md` itself before close
-11. Then run route-specific check (`/debug check` for bot, skill-invocation for skill, etc.)
+11. **Run RC-11 (discipline detection) — runs declared `detection_runner:` blocks per slice §Discipline Impact**
+12. Then run route-specific check (`/debug check` for bot, skill-invocation for skill, etc.)
 
 ALL must PASS or have an explicit override before phase close.
+
+**RC-11 ordering note:** RC-11 runs BEFORE the discipline-receipts.jsonl append (per ship-discipline-detector-runner REQ-17). Receipts append only for D-codes with verdict PASS in RC-11; FAIL/UNRUNNABLE blocks close + skips receipt-append for those D-codes.
