@@ -65,6 +65,8 @@ disciplines:
     detection: runtime conservation assertion every 15min
 ```
 
+**Note (added 2026-05-02 ship-discipline-detector-runner):** the `detection:` field above is human-readable description for the slice. The MACHINE-EXECUTABLE detection (run by RC-11 at Phase 4 LAND) lives in the discipline's rule file at `~/.claude/rules/disciplines/<file>.md` under `## detection_runner` as a structured YAML block (type/scope/pattern/max_violations/etc.). If the rule file lacks a `detection_runner:` block, RC-11 will mark the discipline UNRUNNABLE and BLOCK phase close — fix by either adding the block (see ssot.md / lifecycle-pair.md as canonical examples) or by adding `[skip-detector: <D-code> reason=<text>]` to the slice plan/spec. Drift between the prose `## Detection` table and the `detection_runner:` block in a discipline file = D1 SSOT violation against that discipline file.
+
 ### §X.4 — `gaps:` (F-families touched but with NO active discipline coverage)
 
 If `lens:` includes any F-family that maps only to a blank-titled discipline (e.g. F2.x ordering, F12.x equivalence), flag it explicitly. Slice author chooses:
