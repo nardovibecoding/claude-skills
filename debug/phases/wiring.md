@@ -53,6 +53,18 @@ Verdict matrix:
 | ✗ | n/a | n/a | `not_wired` |
 | (any) | (conflicting) | (any) | `inconclusive` — STOP and surface the conflict |
 
+### Step 9.5 — LABEL-VS-CODE drift check (added 2026-05-02)
+
+Source: vps_sync.sh P2 incident — comment block claimed "if ahead>200 AND no successful push in last hour", code only checked `ahead>200`. /s snapshot read the label, claimed "P2 hardened". `wired` verdict from any prior run that trusted the comment was wrong.
+
+For each feature claimed `wired`, also verify:
+
+1. **Label match.** The comment/docstring/rule-name describing the feature must match what the code enforces. Heuristic: if the comment contains `if X AND Y` / `if X OR Y`, grep the same function for `&&` / `||` (or `and` / `or`). Mismatch → downgrade verdict to `partial` with sub-reason `label-vs-code drift`.
+2. **Enforcement clause vs description clause.** The feature's enforcement is a `if` / `assert` / `throw` / `block` / hook decision — not a comment block, not a `print(...)` log line, not a constant. When citing the wired evidence, cite the enforcement clause (`file:line` of the conditional), not the rule name.
+3. **Multi-clause coverage.** When the feature description names N conditions joined by AND, the code must reference all N. If only N-1 are checked → `partial`.
+
+Cheap implementation: invoke `python3 ~/.claude/hooks/comment_code_audit.py --diff <feature-add-sha>..HEAD --strict` against the commit that wired the feature; non-empty findings → downgrade.
+
 ### Step 16 — LEDGER write
 Append entry to `~/NardoWorld/realize-debt.md` per master plan §9 schema. ID = max existing `R-NNNN` + 1, zero-padded. Idempotency: if an entry already exists with same `(ship_slug, feature_name)` and status `wired`, do NOT duplicate — log `(dedup'd against existing R-NNNN)` and return the existing ID.
 
