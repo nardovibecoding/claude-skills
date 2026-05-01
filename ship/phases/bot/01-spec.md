@@ -21,6 +21,16 @@ Apply these when making judgment calls during any phase. Surface only User-Chall
 - NEVER include the full §0-§N body in the return message. The file on disk is the source of truth.
 - Phase is not closed until `test -s .ship/<feature>/0N-<phase>.md` passes.
 
+## Discipline Impact gate (HARD)
+
+This brief MUST include a §Discipline Impact section per `~/.claude/skills/ship/phases/common/discipline-impact.md`. Mandatory sub-fields:
+- `lens:` — F-families from `~/.claude/rules/invariant-taxonomy.md` (F1.1, F4.5, F10.1, …)
+- `applicable_DIs:` — project domain invariants from `<project>/.ship/_meta/domain-invariants.md` (per M1 meta-rule); empty allowed only with 1-line justification
+- `disciplines:` — active D-codes from `~/.claude/rules/disciplines/_index.md` mapped to F-families above
+- `gaps:` — F-families touched but covered only by blank-titled disciplines, each with `gap_action: accept|build_detector|defer`
+
+Phase rejected if any of G-D1..G-D5 fail (see template). Phase 4 LAND must append receipts to `~/.claude/scripts/state/discipline-receipts.jsonl` per discipline this slice violated and closed.
+
 ## Acceptance Criteria format (EARS — mandatory)
 
 Every AC in this spec MUST match one of these five EARS patterns. Prose ACs are REJECTED by strict-plan auditor — failing EARS parse = phase does not close.
