@@ -83,6 +83,10 @@ Source: 2026-04-27 — discovered `/upskill` was marked shipped at v1 with SOP s
 
 Standard SPREAD/SHRINK per `phases/common/refresh.md`.
 
+## RC-11 Discipline Detection gate (HARD — added 2026-05-02)
+
+Same as bot/04-land.md §"RC-11 Discipline Detection gate" — runs `~/.claude/scripts/discipline-detector-runner.py` against the slice's §Discipline Impact disciplines block. Block close on FAIL/UNRUNNABLE; receipt-append gated on PASS. For SKILL slices the runner default is `--scope=full` (harness has no git) unless `--paths=<...>` is supplied.
+
 ## Reference
 
 Inherit base phase template from `phases/bot/04-land.md` for ledger-writing protocol, override format, OUTPUT CONTRACT enforcement. Skill-specific differences are documented above.
