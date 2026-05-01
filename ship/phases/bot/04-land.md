@@ -168,6 +168,25 @@ Verdict must be `race_free`. `race_present (...)` blocks Phase 4 close. Findings
 
 Phase is NOT closed until all 10 items answered.
 
+## RC-11 Discipline Detection gate (HARD — added 2026-05-02)
+
+BEFORE writing any discipline receipts, run RC-11 per `~/.claude/skills/ship/phases/common/realization-checks.md`:
+
+```bash
+python3 ~/.claude/scripts/discipline-detector-runner.py \
+    --slug <slug> \
+    --repo <repo-root> \
+    --scope diff [--base <sha>]
+```
+
+Block close on FAIL or UNRUNNABLE. For UNRUNNABLE disciplines lacking a `detection_runner:` block, either:
+- Add the block to the discipline's rule file (`~/.claude/rules/disciplines/<file>.md`), OR
+- Add `[skip-detector: D-X reason=<text>]` to plan/spec, logged to `~/.claude/scripts/state/detector-skips.jsonl`.
+
+Results land at `<slice>/state/04-discipline-detection-results.md`. Receipts (below) append ONLY for D-codes with verdict PASS.
+
+Source: ship-discipline-detector-runner slice (2026-05-02). Closes paperwork-vs-enforcement gap.
+
 ## Discipline receipts (HARD — gate G-D5)
 
 For every D-discipline this slice violated AND closed, append a receipt to the ledger via:
