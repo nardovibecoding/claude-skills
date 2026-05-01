@@ -167,3 +167,22 @@ Verdict must be `race_free`. `race_present (...)` blocks Phase 4 close. Findings
 - Sh5 Simplification — can this be fewer lines?
 
 Phase is NOT closed until all 10 items answered.
+
+## Discipline receipts (HARD — gate G-D5)
+
+For every D-discipline this slice violated AND closed, append a receipt to the ledger via:
+
+```bash
+~/.claude/scripts/append-discipline-receipt.sh <D-code> <slug> "<violation_class>" "<severity>"
+```
+
+Example (slice closed F4.5 conservation gap):
+
+```bash
+~/.claude/scripts/append-discipline-receipt.sh D14 pm-bot-capital-conservation \
+  "F4.5 conservation" "HIGH-\$"
+```
+
+Receipts feed `~/.claude/scripts/state/discipline-receipts.jsonl`, read by `discipline-ratchet-daemon.py` (LaunchAgent `com.bernard.discipline-ratchet`, daily 09:17). Phase 4 NOT closed until receipts appended for each D-code listed in Phase 1+2 §Discipline Impact `disciplines:` block.
+
+If slice closed no discipline gaps (e.g. pure refactor), state explicitly: "no receipts — slice did not close any D-violation".
