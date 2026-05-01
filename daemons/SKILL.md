@@ -181,9 +181,9 @@ fi
 | bundle has only Mac (12 missing) | VPS daemons errored | `ssh hel "tail ~/.cache/bigd/bigd_parallel.log"` |
 | panel renders with 0 actions | working as intended (clean day) — not a failure | n/a |
 
-## Discipline-routed detection (added 2026-05-01)
+## Discipline + Concern-routed detection (added 2026-05-01)
 
-Daemon detectors should declare which F-family / D-code they cover so the ratchet rule (`~/.claude/rules/disciplines/_index.md` §Ratchet rule) can route receipts back to the right discipline.
+Daemon detectors declare which **F-family / D-code** (structural invariants) AND/OR which **C-code** (concern axis) they cover. Receipts route to two ledgers — `discipline-receipts.jsonl` for D, `concern-receipts.jsonl` for C. Ratchet rule fires on either when ≥10 receipts/30d for any code.
 
 Source taxonomy:
 - `~/.claude/rules/invariant-taxonomy.md` — F1.1-F16.4 invariant families
