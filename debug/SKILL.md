@@ -95,8 +95,12 @@ Source: obra/superpowers (MIT). Both laws apply to all /debug modes; full enforc
 | "X wedged / frozen in kernel / D-state / SIGTERM hangs / process alive but silent" | Wedge (Group A) | `phases/wedge.md` |
 | "what's wrong with X" / "red team X" / "find flaws in X" / "attack X" / "critic X" | Critic (Group D) | `phases/critic.md` |
 | (daemon-driven, no phrase) | Orphan / Zombie (Group C) | consistency-daemon detector (S5) |
+| **2026-05-01 jz-mode concerns verbs** | | |
+| `/debug stress <unit>` / "X under load" / "10x stress" | Stress (Group A — Concern C6) | `phases/stress.md` (TBD; clones performance.md) |
+| `/debug cost <unit>` / "X cost vs profit" / "X tier exhausted" | Cost (Group A — Concern C1) | reads `_meta/concerns.md` thresholds |
+| `/debug risk <unit>` / "Kelly calibration" / "vol estimate stale" | Risk (Group A — Concern C5) | reads `_meta/concerns.md` thresholds |
 
-Shipped modes: Wiring (S1) + Bug (S3) + Drift/Flaky/Performance (S8) + ledger view. Zombie / Orphan modes remain daemon-driven (S5 not yet shipped).
+Shipped modes: Wiring (S1) + Bug (S3) + Drift/Flaky/Performance (S8) + ledger view. Stress/Cost/Risk verbs added 2026-05-01 (concern axes — verb prose live, phase files TBD; verdicts must include `Concern: C<N>` line per debug-triage-gate.py). Zombie / Orphan modes remain daemon-driven (S5 not yet shipped).
 
 ## Verbs
 
