@@ -13,6 +13,16 @@ If this PLAN produces a regex / classifier / scorer / router / pattern-matcher /
 - NEVER include the full §0-§N body in the return message. The file on disk is the source of truth.
 - Phase is not closed until `test -s .ship/<feature>/0N-<phase>.md` passes.
 
+## Discipline Impact gate (HARD)
+
+This PLAN MUST include a §Discipline Impact section per `~/.claude/skills/ship/phases/common/discipline-impact.md`. Mandatory sub-fields:
+- `lens:` — F-families from `~/.claude/rules/invariant-taxonomy.md` (F1.1, F4.5, F10.1, …) with 1-line rationale per code
+- `applicable_DIs:` — project domain invariants from `<project>/.ship/_meta/domain-invariants.md` (per M1 meta-rule); empty allowed only with 1-line justification
+- `disciplines:` — active D-codes from `~/.claude/rules/disciplines/_index.md` mapped to F-families above, each declaring its `detection:` mechanism (write-time grep / commit-time hook / runtime assertion)
+- `gaps:` — F-families in `lens:` covered only by blank-titled disciplines, each with `gap_action: accept|build_detector|defer`
+
+Phase rejected if G-D1..G-D5 fail. Each vertical slice (step 4 below) carries its own `lens:` so Phase 4 LAND receipts are slice-attributable.
+
 ## Steps
 
 1. **Plan agent drafts** — spawn `Plan` subagent (Sonnet default) with spec + codebase context. Output: architecture sketch, components, files touched.
