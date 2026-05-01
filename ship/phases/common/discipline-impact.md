@@ -35,6 +35,19 @@ applicable_DIs: [DI.1, DI.3, DI.7, DI.9]
 
 If `applicable_DIs:` is empty, justify in 1 line: "this slice does not affect any domain invariant because <reason>". Empty without justification = phase rejected.
 
+### §X.2b — `applicable_concerns:` (project quality-axis concerns this slice could affect)
+
+Per M2 meta-rule. Read `<project>/.ship/_meta/concerns.md`; list which C-codes (C1-C7) this slice's surface could touch. Phase 4 LAND must verify each listed concern's threshold still holds post-deploy; concern-receipt appended to `~/.claude/scripts/state/concern-receipts.jsonl`.
+
+```yaml
+applicable_concerns: [C1, C3, C7]
+```
+
+C-codes from `~/.claude/rules/concerns-taxonomy.md`:
+- C1 Cost / C2 Resilience / C3 Behavioral / C4 External drift / C5 Model accuracy / C6 Stress / C7 Security
+
+If `applicable_concerns:` is empty, justify: "no concerns affected because <reason>". Empty without justification = phase rejected.
+
 ### §X.3 — `disciplines:` (which active disciplines this slice activates)
 
 Map each entry in `lens:` to one or more disciplines from `~/.claude/rules/disciplines/_index.md`. This makes the enforcement axis explicit.
