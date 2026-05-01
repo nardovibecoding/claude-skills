@@ -26,6 +26,7 @@ Apply these when making judgment calls during any phase. Surface only User-Chall
 This brief MUST include a §Discipline Impact section per `~/.claude/skills/ship/phases/common/discipline-impact.md`. Mandatory sub-fields:
 - `lens:` — F-families from `~/.claude/rules/invariant-taxonomy.md` (F1.1, F4.5, F10.1, …)
 - `applicable_DIs:` — project domain invariants from `<project>/.ship/_meta/domain-invariants.md` (per M1 meta-rule); empty allowed only with 1-line justification
+- `applicable_concerns:` — project quality-axis concerns from `<project>/.ship/_meta/concerns.md` (per M2 meta-rule); C1-C7 from `~/.claude/rules/concerns-taxonomy.md`; empty allowed only with 1-line justification
 - `disciplines:` — active D-codes from `~/.claude/rules/disciplines/_index.md` mapped to F-families above
 - `gaps:` — F-families touched but covered only by blank-titled disciplines, each with `gap_action: accept|build_detector|defer`
 
