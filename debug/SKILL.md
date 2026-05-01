@@ -79,6 +79,31 @@ NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
 
 Source: obra/superpowers (MIT). Both laws apply to all /debug modes; full enforcement spec in shared preamble.
 
+## Symptom → F-family routing (added 2026-05-02)
+
+Before dispatching a debug verb, select the F-family lens prior from the table below. F-codes reference `~/.claude/rules/invariant-taxonomy.md` (16 families). The lens prior is surfaced in the verb's verdict header line 1: `family: F<N>.<sub> | verb: <verb> | target: <X>`. When two families apply, list both; pick the higher-severity one as primary.
+
+| Symptom phrase | Primary F-family | Secondary | Verb |
+|---|---|---|---|
+| "X is wedged / frozen in kernel / D-state / SIGTERM hangs / process alive but silent" | F7.1 progress | F7.3 timeout | wedge |
+| "X is leaking / OOM / RSS climb / heap exhausted / memory bloat" | F4.2 count-bound | — | leak |
+| "X is slow / hot / high CPU / event-loop lag" | F4.3 rate-bound | F7.3 timeout | performance |
+| "X used to work / now stale / drifted" | F8.2 reconciliation | F13.4 config drift | drift |
+| "X is flaky / sometimes fails / intermittent" | F6.1 RMW atomicity | F2.4 causal-order `gap:D-blank-1` | flaky |
+| "X is wrong / broken / crashing / silently dropped / why isn't X" | F1.1 state-pair | F9.1 silent catch, F10.1 state-emit | bug |
+| "is X live / wired / actually running / did we wire X" | F10.4 heartbeat | F13.4 config drift | check |
+| "X under load / 10x stress / saturation point" | F4.1 sum-bound | F4.3 rate-bound | stress |
+| "X cost vs profit / token spend spike / tier exhausted" | F4.3 rate-bound | — | cost |
+| "Kelly calibration / vol estimate stale / Brier drift / live PnL ≠ backtest" | F12.1 cross-path equivalence `gap:D-blank-4` | F15.1 pure-when-claimed `gap:D-blank-6` | risk |
+| "X fires but Y is empty" | F2.4 causal-order `gap:D-blank-1` | F8.3 cross-host causal `gap:D-blank-3` | race |
+| "double-fill / duplicate order / retry inflated total" | F5.2 idempotency | F8.1 dedup | bug or critic |
+| "schema drift / parse fail / writer-reader mismatch" | F3.1 schema-pair | F3.3 runtime-vs-static | drift or bug |
+| "what's wrong with X / red team X / find flaws in X / attack X / critic X" | (table-wide adversarial) | — | critic |
+
+**Disambiguation.** Multi-family symptoms: pick the highest-severity HIGH-flagged family from `~/.claude/rules/disciplines/_index.md` first; fall through if absent.
+
+**Gap rows (`gap:D-blank-N`).** F-family routes to a blank-titled (unwired) discipline. Verdict still surfaces the F-family but flags `coverage: blank`; no detector enforcement yet — promotion to active when ≥2 receipts in 30d per ratchet rule.
+
 ## Trigger routing (per master plan §8)
 
 | User phrase | Mode | Phase file |
