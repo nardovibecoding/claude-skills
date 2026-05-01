@@ -146,18 +146,55 @@ v1: declarative only — no runtime graph. v2 (future): build a graph + propagat
 
 ---
 
+## RC-9 — Comment-vs-code clause audit (T2.6 — added 2026-05-02)
+
+For ANY shipped artifact whose changeset adds multi-clause comment blocks (e.g. "if X AND Y, then Z"), grep the same diff for matching boolean operators on the named conditions. Mismatch BLOCKS phase close.
+
+Trigger: `git diff <base>..HEAD` produces hunks where added comment lines contain " AND " / " OR " in clause-joining context AND added code lines lack `&&` / `||` (or `and` / `or` keywords).
+
+Method (cheap, runs in ~1s):
+```bash
+# Same logic as ~/.claude/hooks/comment_code_audit.py but scoped to changeset.
+# Pilot hook is log-only on commit; this is the hard gate at phase close.
+python3 ~/.claude/hooks/comment_code_audit.py --diff "<base>..HEAD" --strict
+```
+
+Override: `.ship/<slug>/state/04-comment-clause-override.md` citing why the comment is intentionally broader than the code (e.g. "comment describes intent for next slice; this slice ships only the X clause; tracker issue #N").
+
+Why this exists: vps_sync.sh ship 2026-05-01 added P2 comment block with "if ahead>200 AND no successful push in last hour" but code only checked `ahead>200`. /s snapshot read the comment label, claimed "P2 hardened". Detected 2026-05-02. RC-9 catches this shape at phase close.
+
+---
+
+## RC-10 — Enforcement-clause citation audit (T2.7 — added 2026-05-02)
+
+Every Phase 4 LAND verdict bullet using enforcement verbs ("hardened", "wired", "shipped", "gated", "enforced", "blocked", "guarded", "fixed") MUST end with `[file:line-or-range]` pointing at the actual enforcement clause — not the label, the comment block, the rule name, or the function declaration.
+
+Verification (during LAND):
+1. For each enforcement-verb bullet in `04-land.md`, extract the cited file:line range
+2. Read those lines via Read tool
+3. Confirm the cited line(s) contain the keyword/symbol/condition the bullet claims (per CLAUDE.md §Citation precision: ≤5 lines, keyword must be on cited line)
+4. If the cite points at a comment that DESCRIBES the rule rather than ENFORCES it → BLOCK with reason "label-vs-code drift: cite must point at enforcement, not description"
+
+Override: only when the enforcement is genuinely declarative (a config value rather than a code branch); state explicitly in the override file.
+
+Why this exists: same incident as RC-9. /s snapshot read "P2 hardened" without verifying which line enforced P2. Citation rule prevents the same drift in /ship's own outputs. Mirrors O1 rule extended to /s skill on 2026-05-02.
+
+---
+
 ## Application order
 
 For each Phase 4 LAND closure:
 
 1. Run RC-1 (stub markers) — fastest, catches most failures
 2. Run RC-7 (hook-output) — fastest, catches privacy regressions
-3. Run RC-2 (SPEC drift) — moderate cost, catches doc lies
-4. Run RC-3 (idempotency) — only if installer-shape change
-5. Run RC-4 (sync-hook) — only if sync-script-shape change
-6. Run RC-5 (cross-host) — only if multi-host change
-7. Run RC-6 (cross-repo links) — only if public-repo README change
-8. Run RC-8 (deps) — only if SKILL with declared deps
-9. Then run route-specific check (`/debug check` for bot, skill-invocation for skill, etc.)
+3. Run RC-9 (comment-vs-code) — fast, catches label-vs-code drift
+4. Run RC-2 (SPEC drift) — moderate cost, catches doc lies
+5. Run RC-3 (idempotency) — only if installer-shape change
+6. Run RC-4 (sync-hook) — only if sync-script-shape change
+7. Run RC-5 (cross-host) — only if multi-host change
+8. Run RC-6 (cross-repo links) — only if public-repo README change
+9. Run RC-8 (deps) — only if SKILL with declared deps
+10. Run RC-10 (enforcement-cite audit) — runs against `04-land.md` itself before close
+11. Then run route-specific check (`/debug check` for bot, skill-invocation for skill, etc.)
 
 ALL must PASS or have an explicit override before phase close.
