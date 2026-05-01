@@ -180,3 +180,26 @@ fi
 | timed out waiting on VPS | Hel or London SSH down | `ssh hel uptime` / `ssh pm@london uptime`; rerun /daemons after fixing |
 | bundle has only Mac (12 missing) | VPS daemons errored | `ssh hel "tail ~/.cache/bigd/bigd_parallel.log"` |
 | panel renders with 0 actions | working as intended (clean day) — not a failure | n/a |
+
+## Discipline-routed detection (added 2026-05-01)
+
+Daemon detectors should declare which F-family / D-code they cover so the ratchet rule (`~/.claude/rules/disciplines/_index.md` §Ratchet rule) can route receipts back to the right discipline.
+
+Source taxonomy:
+- `~/.claude/rules/invariant-taxonomy.md` — F1.1-F16.4 invariant families
+- `~/.claude/rules/disciplines/_index.md` — D1-D16 active + D-blank-1..7 unwired
+
+Per-detector header (mandatory for new daemons; retrofit existing on next edit):
+
+```python
+# detector: <name>
+# covers: F4.2 (bounded-queue) + F4.3 (rate-bound)
+# discipline: D8
+# severity: HIGH
+# fires_when: <condition>
+# emits_receipt: yes  # appends to ~/.claude/scripts/state/discipline-receipts.jsonl on fire
+```
+
+When a daemon fires, it SHOULD call `~/.claude/scripts/append-discipline-receipt.sh <D-code> <slug> <violation_class> <severity>` to feed the ratchet daemon. New daemon /ship slices that produce detectors must declare `lens:` per `~/.claude/skills/ship/phases/common/discipline-impact.md`.
+
+Existing daemons → the daemon-discipline mapping lives at `~/.ship/bigd-discipline-detector-mapping/goals/01-spec.md` (per ratchet rule activation gate referenced in `~/.claude/skills/ship/phases/common/discipline-impact.md`). When a D-code accumulates ≥10 receipts in 30d, that doc identifies which detector to wire next.
