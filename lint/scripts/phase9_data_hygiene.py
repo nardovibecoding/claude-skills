@@ -368,7 +368,7 @@ def scope_ssot(report: List[str], do_fix: bool, dry_run: bool) -> Dict[str, int]
     if not last_ts:
         report.append("- SKIP query helper unavailable or no events yet\n")
     else:
-        now = dt.datetime.utcnow()
+        now = dt.datetime.now(dt.timezone.utc)
         for host_alias, ts_str in last_ts.items():
             try:
                 # DuckDB returns "YYYY-MM-DD HH:MM:SS.fff"
