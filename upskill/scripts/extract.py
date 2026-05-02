@@ -558,6 +558,9 @@ def main() -> int:
             "installed_at": ts,
             "install_path": install_path or "",
             "security_verdict": security_verdict or "PASS",
+            "discipline_screen": "PASS" if is_install else "EXTRACT-only",
+            "grader_verdict": grader_verdict,
+            "grader_total": grader_total,
             "install_status": install_status,
         }
         _write_ledger(row, dry_run=False)  # always write ledger, even for dry_run (with dry_run status)
