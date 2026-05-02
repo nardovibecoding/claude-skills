@@ -265,11 +265,22 @@ async function rerank(query, candidates) {
 // Recency
 // ---------------------------------------------------------------------------
 
-function recencyRanked(files) {
+function recencyRanked(files, fileParsed) {
   const now = Date.now();
   const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+  // Slice A: prefer fm.updated || fm.date over mtime (handles rotation/rsync/restore mtime drift).
+  const enableFm = process.env.ENABLE_FRONTMATTER_BOOST === "1";
   return files.map((f, index) => {
-    const age = now - f.mtime;
+    let ts = f.mtime;
+    if (enableFm && fileParsed && fileParsed[index]) {
+      const fm = fileParsed[index].fm || {};
+      const fmDate = fm.updated || fm.date;
+      if (fmDate && /^\d{4}-\d{2}-\d{2}/.test(fmDate)) {
+        const fmTs = Date.parse(fmDate.slice(0, 10));
+        if (!isNaN(fmTs)) ts = Math.max(ts, fmTs);
+      }
+    }
+    const age = now - ts;
     const score = age < SEVEN_DAYS ? 1.0 - (age / SEVEN_DAYS) * 0.5 : 0.5 * Math.exp(-(age - SEVEN_DAYS) / (30 * 24 * 60 * 60 * 1000));
     return { index, score };
   }).sort((a, b) => b.score - a.score);
