@@ -31,6 +31,13 @@ FILE_MAP = HOME / "NardoWorld" / "projects" / "prediction-markets" / "file-map.m
 SSOT_DIR_LOCAL = HOME / "NardoWorld" / "meta" / "ssot"
 SSOT_QUERY = HOME / ".claude" / "scripts" / "ssot-query.sh"
 
+# α.S7 — integrity detector (D1+D4)
+sys.path.insert(0, str(HOME / ".claude" / "skills" / "lint" / "_lib"))
+try:
+    from ssot_integrity import run_integrity_checks  # noqa: E402
+except Exception:
+    run_integrity_checks = None  # tolerate absence; integrity row will SKIP
+
 # Hosts in scope (mac is local; others via ssh)
 BOT_HOSTS = [
     {"alias": "hel",    "ssh": "hel",    "data_dir": "/home/bernard/prediction-markets/packages/bot/data", "platform": "kalshi"},
