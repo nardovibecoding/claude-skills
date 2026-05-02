@@ -369,6 +369,26 @@ def scope_ssot(report: List[str], do_fix: bool, dry_run: bool) -> Dict[str, int]
             else:
                 report.append(f"- PASS schema clean ({len(sample)}/{len(sample)} sample rows)\n")
 
+        # α.S7 — integrity (missing-required + unknown-kinds). Local file only (mac).
+        if host["alias"] == "mac" and run_integrity_checks is not None:
+            local_path = SSOT_DIR_LOCAL / "ssot.jsonl"
+            try:
+                ic = run_integrity_checks(local_path)
+                missing = ic.get("missing_required", 0)
+                unk = ic.get("unknown_kinds", {}) or {}
+                unk_total = sum(unk.values())
+                verdict_m = "PASS" if missing == 0 else "FAIL"
+                verdict_u = "PASS" if unk_total == 0 else "WARN"
+                report.append(f"- {verdict_m} host=mac integrity_missing_required={missing}\n")
+                report.append(f"- {verdict_u} host=mac integrity_unknown_kinds={unk_total}")
+                if unk:
+                    report.append(f" detail={dict(sorted(unk.items()))}")
+                report.append("\n")
+                counts["integrity_missing_required"] = counts.get("integrity_missing_required", 0) + missing
+                counts["integrity_unknown_kinds"] = counts.get("integrity_unknown_kinds", 0) + unk_total
+            except Exception as e:
+                report.append(f"- SKIP integrity check error={e}\n")
+
     # 4. Writer-gap detection
     report.append("\n### Writer-gap detection (cross-host MAX(ts))\n")
     last_ts = _query_writer_gap()
