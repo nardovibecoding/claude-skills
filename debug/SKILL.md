@@ -102,6 +102,8 @@ Before dispatching a debug verb, select the F-family lens prior from the table b
 
 **Disambiguation.** Multi-family symptoms: pick the highest-severity HIGH-flagged family from `~/.claude/rules/disciplines/_index.md` first; fall through if absent.
 
+**Smart-router cross-ref (added 2026-05-02 ship-discipline-detectors-jz JZ-7-bonus).** Each debug verb maps to a primary lens (F-codes) declared in `DEBUG_VERB_LENS` at `~/NardoWorld/scripts/bigd/_lib/smart_router.py`. Helper `disciplines_for_debug_verb(verb)` returns the related D-codes for advisory output. Examples: `bug → D5+D11`, `leak → D8`, `wedge → D5+D9`, `flaky → D1`. Verdict header CAN include `related disciplines: <D-codes>` line for cross-reference; not enforcement.
+
 **Gap rows (`gap:D-blank-N`).** F-family routes to a blank-titled (unwired) discipline. Verdict still surfaces the F-family but flags `coverage: blank`; no detector enforcement yet — promotion to active when ≥2 receipts in 30d per ratchet rule.
 
 ## Trigger routing (per master plan §8)
