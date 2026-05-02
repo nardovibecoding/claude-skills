@@ -33,7 +33,7 @@ HKT = ZoneInfo("Asia/Hong_Kong")
 LEDGER = Path.home() / ".claude/scripts/state/upskill-installs.jsonl"
 SKILLS_DIR = Path.home() / ".claude/skills"
 ATOMS_DIR = Path.home() / "NardoWorld/atoms/extracted-patterns"
-AUDITOR = Path.home() / ".claude/skills/skill-security-auditor/scripts/skill_security_auditor.py"
+AUDITOR = Path.home() / ".claude/skills/upskill/scripts/skill_security_auditor.py"
 
 
 def _now_hkt() -> str:
