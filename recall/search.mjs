@@ -703,6 +703,29 @@ async function main() {
     fused.sort((a, b) => b.score - a.score);
   }
 
+  // ── Slice B: frontmatter-aware boost + status filter (gated by ENABLE_FRONTMATTER_BOOST=1) ──
+  // Cube boost: +0.01 to fused score when fm.cube === queryCube (top-50 only, post-graph-boost).
+  // Status filter: drop files where fm.status ∈ {retired, superseded}.
+  // Default OFF until O3 held-out validation gates flag-flip.
+  if (process.env.ENABLE_FRONTMATTER_BOOST === "1") {
+    if (queryCube) {
+      for (const r of fused.slice(0, 50)) {
+        const fmCube = (fileParsed[r.index].fm.cube || "").trim();
+        if (fmCube && fmCube === queryCube) {
+          r.score += 0.01;
+          r.cubeBoosted = true;
+        }
+      }
+    }
+    const droppedStatus = new Set(["retired", "superseded"]);
+    for (const r of fused) {
+      const st = (fileParsed[r.index].fm.status || "").trim();
+      if (droppedStatus.has(st)) r.score = -Infinity;
+    }
+    fused.sort((a, b) => b.score - a.score);
+    while (fused.length && fused[fused.length - 1].score === -Infinity) fused.pop();
+  }
+
   // Cross-encoder rerank on top-N candidates
   let final = fused.slice(0, TOP_K);
   let rerankedLabels = null;
