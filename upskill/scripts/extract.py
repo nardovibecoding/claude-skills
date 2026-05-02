@@ -391,6 +391,108 @@ def main() -> int:
             # Proceeded past WARN — continue with security_verdict = WARN
 
         # ---------------------------------------------------------------
+        # Step 4.5 — Discipline-detector grader (JZ-7, added 2026-05-02)
+        # ---------------------------------------------------------------
+        # Runs ~/NardoWorld/scripts/bigd/_lib/discipline_detector.py library
+        # against the candidate staging_dir. Aggregates per-D-code violation
+        # counts. Reject install if any HIGH-severity discipline FAILs OR
+        # cumulative violations exceed threshold (>200).
+        if args.dry_run or args.mock_fail_security or args.mock_warn_security:
+            grader_verdict = "SKIP"
+            grader_findings: list[dict] = []
+            grader_total = 0
+        else:
+            try:
+                lib_dir = Path.home() / "NardoWorld" / "scripts" / "bigd" / "_lib"
+                sys.path.insert(0, str(lib_dir))
+                from discipline_detector import run_disciplines  # type: ignore
+                from smart_router import parse_index_disciplines  # type: ignore
+
+                all_d = parse_index_disciplines()
+                disciplines_to_run = {d: {} for d in all_d}
+                results = run_disciplines(
+                    disciplines_to_run=disciplines_to_run,
+                    repo=Path(staging_dir),
+                    scope_mode="full",
+                    slug=f"upskill-{slug}",
+                    caller="upskill",
+                )
+                grader_total = sum(len(r.violations) for r in results)
+                HIGH_DCODES = {"D1", "D2", "D3a", "D5", "D6", "D7", "D8",
+                               "D9", "D10", "D11", "D14", "D15", "D16"}
+                high_fails = [r for r in results
+                              if r.verdict == "FAIL" and r.d_code in HIGH_DCODES]
+                grader_findings = [
+                    {"d_code": r.d_code, "verdict": r.verdict,
+                     "violations": len(r.violations), "note": r.note}
+                    for r in results if r.verdict == "FAIL"
+                ]
+                if high_fails:
+                    grader_verdict = "FAIL"
+                elif grader_total > 200:
+                    grader_verdict = "FAIL"
+                elif grader_total > 50:
+                    grader_verdict = "WARN"
+                else:
+                    grader_verdict = "PASS"
+            except Exception as e:  # noqa: BLE001 — best-effort, never block install
+                grader_verdict = "ERROR"
+                grader_findings = [{"detail": f"grader error: {str(e)[:300]}"}]
+                grader_total = 0
+
+        if grader_verdict == "FAIL":
+            print(f"DISCIPLINE GRADER: FAIL — {grader_total} violations "
+                  f"(or HIGH-severity disciplines failing); install blocked.",
+                  file=sys.stderr)
+            for f in grader_findings[:10]:
+                print(f"  - {f}", file=sys.stderr)
+            install_status = "aborted_grader_fail"
+            ts = _now_hkt()
+            row = {
+                "ts": ts, "slug": slug, "source_url": url, "source_sha": sha,
+                "installed_at": "", "install_path": "",
+                "security_verdict": security_verdict, "install_status": install_status,
+                "grader_verdict": grader_verdict, "grader_total": grader_total,
+            }
+            _write_ledger(row, dry_run=args.dry_run)
+            ledger_appended = True
+            _write_out(args.out, {
+                "slug": slug, "source_url": url, "source_sha": sha,
+                "install_status": install_status, "security_verdict": security_verdict,
+                "grader_verdict": grader_verdict, "grader_total": grader_total,
+                "install_path": None, "ledger_row_appended": True, "staging_cleaned": False,
+            })
+            return 0
+        elif grader_verdict == "WARN" and tty_ok:
+            print(f"DISCIPLINE GRADER: WARN — {grader_total} violations "
+                  f"({len(grader_findings)} disciplines failing). Review before install:",
+                  file=sys.stderr)
+            for f in grader_findings[:10]:
+                print(f"  - {f}", file=sys.stderr)
+            answer = _prompt("Install despite grader WARN? [Y/n]: ", {"Y", "y", "n"})
+            if answer not in ("Y", "y"):
+                install_status = "aborted_grader_warn"
+                ts = _now_hkt()
+                row = {
+                    "ts": ts, "slug": slug, "source_url": url, "source_sha": sha,
+                    "installed_at": "", "install_path": "",
+                    "security_verdict": security_verdict,
+                    "install_status": install_status,
+                    "grader_verdict": grader_verdict, "grader_total": grader_total,
+                }
+                _write_ledger(row, dry_run=args.dry_run)
+                ledger_appended = True
+                _write_out(args.out, {
+                    "slug": slug, "source_url": url, "source_sha": sha,
+                    "install_status": install_status,
+                    "security_verdict": security_verdict,
+                    "grader_verdict": grader_verdict, "grader_total": grader_total,
+                    "install_path": None, "ledger_row_appended": True,
+                    "staging_cleaned": False,
+                })
+                return 0
+
+        # ---------------------------------------------------------------
         # Step 5 — EXTRACT-vs-INSTALL decision
         # ---------------------------------------------------------------
         # INSTALL if staging dir has scripts/ OR hooks/ OR lib/ subdir
