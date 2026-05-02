@@ -672,7 +672,7 @@ async function main() {
   const vectorRanked = [...vectorScores].sort((a, b) => b.score - a.score);
 
   // Recency
-  const recencyRank = recencyRanked(files);
+  const recencyRank = recencyRanked(files, fileParsed);
 
   // Weighted RRF: --weights '<json>' CLI flag overrides loadWeights() (cube-classifier path)
   const weights = weightsOverride ? { ...loadWeights(), ...weightsOverride } : loadWeights();
