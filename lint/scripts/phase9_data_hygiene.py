@@ -371,6 +371,9 @@ def scope_ssot(report: List[str], do_fix: bool, dry_run: bool) -> Dict[str, int]
         now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
         for host_alias, ts_str in last_ts.items():
             try:
+                if ts_str is None:
+                    report.append(f"- SKIP host={host_alias} reason=ts-null\n")
+                    continue
                 # DuckDB returns "YYYY-MM-DD HH:MM:SS.fff"
                 last = dt.datetime.strptime(ts_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
             except ValueError:
