@@ -140,7 +140,7 @@ def _list_dir(host: Dict, dir_path: str) -> List[Tuple[str, int, int]]:
         cmd = (f"cd '{dir_path}' 2>/dev/null && "
                f"find . -maxdepth 1 -type f 2>/dev/null | "
                f"while read f; do "
-               f"  stat -f '%N\\t%z\\t%m' \"$f\" 2>/dev/null || stat -c '%n\\t%s\\t%Y' \"$f\" 2>/dev/null; "
+               f"  stat -f '%N\t%z\t%m' \"$f\" 2>/dev/null || stat -c '%n\t%s\t%Y' \"$f\" 2>/dev/null; "
                f"done")
         rc, out, _ = _run(["bash", "-c", cmd])
     rows = []
