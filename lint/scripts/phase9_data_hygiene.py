@@ -467,7 +467,9 @@ def main():
                       f"retention_prune={ssot_counts.get('retention_prune', 0)}, "
                       f"drift_rows={ssot_counts.get('drift_rows', 0)}, "
                       f"writer_gap={ssot_counts.get('writer_gap', 0)}, "
-                      f"missing_host={ssot_counts.get('missing_host', 0)}\n")
+                      f"missing_host={ssot_counts.get('missing_host', 0)}, "
+                      f"integrity_missing_required={ssot_counts.get('integrity_missing_required', 0)}, "
+                      f"integrity_unknown_kinds={ssot_counts.get('integrity_unknown_kinds', 0)}\n")
 
     sys.stdout.write("".join(report))
     sys.stdout.flush()
