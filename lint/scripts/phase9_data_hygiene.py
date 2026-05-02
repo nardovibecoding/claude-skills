@@ -389,6 +389,25 @@ def scope_ssot(report: List[str], do_fix: bool, dry_run: bool) -> Dict[str, int]
             except Exception as e:
                 report.append(f"- SKIP integrity check error={e}\n")
 
+    # α.S9 — backup age detector (D6 live-truth: .last_backup ISO-ts ≤25h)
+    report.append("\n### Backup freshness (α.S9 — D6)\n")
+    last_backup_path = SSOT_DIR_LOCAL / ".last_backup"
+    if not last_backup_path.exists():
+        report.append("- SKIP .last_backup file missing (backup never run)\n")
+        counts["backup_missing"] = counts.get("backup_missing", 0) + 1
+    else:
+        try:
+            ts_str = last_backup_path.read_text().strip()
+            ts = dt.datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
+            age_h = (dt.datetime.now(dt.timezone.utc) - ts).total_seconds() / 3600.0
+            verdict = "PASS" if age_h <= 25.0 else "WARN"
+            report.append(f"- {verdict} backup_age_h={age_h:.1f} (threshold 25h) last_backup={ts_str}\n")
+            counts["backup_age_h"] = age_h
+            if age_h > 25.0:
+                counts["backup_stale"] = counts.get("backup_stale", 0) + 1
+        except Exception as e:
+            report.append(f"- SKIP .last_backup parse error={e}\n")
+
     # 4. Writer-gap detection
     report.append("\n### Writer-gap detection (cross-host MAX(ts))\n")
     last_ts = _query_writer_gap()
