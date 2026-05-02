@@ -320,7 +320,7 @@ def scope_ssot(report: List[str], do_fix: bool, dry_run: bool) -> Dict[str, int]
             counts["oversize"] += 1
             if do_fix and not dry_run:
                 # Rotate via remote cmd
-                stamp = dt.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+                stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
                 rotate_cmd = (f"cd {host['ssot_dir']} && mv ssot.jsonl ssot.{stamp}.jsonl && "
                               f"touch ssot.jsonl && chmod 644 ssot.jsonl && gzip ssot.{stamp}.jsonl &")
                 if host["ssh"]:
