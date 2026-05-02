@@ -100,9 +100,39 @@ def check_unknown_kinds(jsonl_path: Path, since_hours: int = 24) -> Dict[str, in
     return unknown
 
 
-def check_writer_health_absence(jsonl_path: Path) -> bool:
-    """STUB — α.S10 fills the detection logic. Returns True (placeholder OK)."""
-    return True
+def check_writer_health_absence(jsonl_path: Path, window_minutes: int = 30) -> bool:
+    """Return True if NO kind=writer_health row found in the last window_minutes.
+
+    Filled by α.S10 (replaces STUB). Phase 9 calls this; result emitted as
+    writer_health_absence=<bool> per host.
+
+    True  = health row absent (alarm condition).
+    False = health row present within window (healthy).
+    """
+    p = Path(jsonl_path)
+    if not p.exists():
+        return True  # no file = definitely absent
+    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=window_minutes)
+    cutoff_iso = cutoff.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    # Scan backwards (most recent rows last) — read whole file but bail on first match.
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.rstrip("\n")
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if row.get("kind") != "writer_health":
+                    continue
+                ts = row.get("ts") or ""
+                if ts >= cutoff_iso:
+                    return False  # found a fresh writer_health row
+    except Exception:
+        return True  # unreadable file = treat as absent
+    return True  # no writer_health row in window
 
 
 def run_integrity_checks(jsonl_path: Path) -> dict:
