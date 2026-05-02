@@ -53,7 +53,11 @@ if (weightsIdx !== -1 && args[weightsIdx + 1]) {
   try { weightsOverride = JSON.parse(args[weightsIdx + 1]); }
   catch (e) { console.error(`[search.mjs] --weights parse failed: ${e.message}; using default`); }
 }
-const query = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--weights")[0];
+// Slice B: --cube <name> for frontmatter cube-match boost (gated by ENABLE_FRONTMATTER_BOOST=1)
+let queryCube = null;
+const cubeIdx = args.findIndex(a => a === "--cube");
+if (cubeIdx !== -1 && args[cubeIdx + 1]) queryCube = args[cubeIdx + 1];
+const query = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--weights" && args[i - 1] !== "--cube")[0];
 if (!query) {
   console.error("Usage: node search.mjs \"<query>\" [--json] [--no-rerank|--no-hyde|--no-prf|--no-log] [--weights '<json>']");
   process.exit(1);
