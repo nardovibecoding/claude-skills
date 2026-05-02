@@ -67,3 +67,11 @@ Skip Phase 9 for `/lint --quick`. Unattended mode runs Phase 9 in dry-mode (warn
 
 - **H2 schema-drift detector** (`detect_schema_drift`): regex/structural rule set, validated per ship.md HARD RULE — see `~/.ship/ssot-log/experiments/heuristic-validation.md` H2 section.
 - **H3 path classifier** (`classify_pollution`): regex `^(clob_|polymarket_|poly_)` (poly-side) and `^kalshi_` (kalshi-side), validated per ship.md HARD RULE — see same file H3 section.
+
+## Integrity check (α.S7, 2026-05-02)
+
+Module: `~/.claude/skills/lint/_lib/ssot_integrity.py`. Source-of-truth for the `KNOWN_KINDS` registry (α=17, β=6, γ=1 = 24 total). β/γ slice owners MUST update this module when introducing new event kinds.
+
+Per-host integrity row (mac only — local file path required):
+- `integrity_missing_required` — rows where `event_id`/`ts`/`host` is null or row is JSON-malformed.
+- `integrity_unknown_kinds` — kinds in last 24h not in `KNOWN_KINDS` (warning only).
