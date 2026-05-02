@@ -415,7 +415,7 @@ def main():
 
     report: List[str] = []
     report.append(f"# /lint Phase 9 — data-hygiene report\n")
-    report.append(f"\nGenerated: {dt.datetime.utcnow().isoformat(timespec='seconds')}Z  scope={args.scope}  fix={do_fix}\n")
+    report.append(f"\nGenerated: {dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}  scope={args.scope}  fix={do_fix}\n")
 
     file_map = _read_file_map()
 
