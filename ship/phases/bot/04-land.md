@@ -205,3 +205,21 @@ Example (slice closed F4.5 conservation gap):
 Receipts feed `~/.claude/scripts/state/discipline-receipts.jsonl`, read by `discipline-ratchet-daemon.py` (LaunchAgent `com.bernard.discipline-ratchet`, daily 09:17). Phase 4 NOT closed until receipts appended for each D-code listed in Phase 1+2 §Discipline Impact `disciplines:` block.
 
 If slice closed no discipline gaps (e.g. pure refactor), state explicitly: "no receipts — slice did not close any D-violation".
+
+### D7 root-cause-first auto-bridge (HARD — added 2026-05-03)
+
+If `.ship/<slug>/experiments/rounds.md` exists, count rounds and emit a D7 receipt:
+
+```bash
+ROUNDS_FILE=".ship/<slug>/experiments/rounds.md"
+N=$(grep -cE "^#{2,4} Round" "$ROUNDS_FILE")
+case "$N" in
+  0|1|2) VERDICT="PASS" ;;     # within 2-tweak budget
+  3)     VERDICT="PARTIAL" ;;  # escalation triggered, root-cause found
+  *)     VERDICT="FAIL" ;;     # ≥4 rounds = flag-tweak loop
+esac
+~/.claude/scripts/append-discipline-receipt.sh D7 <slug> \
+  "process N=$N rounds verdict=$VERDICT" "HIGH"
+```
+
+Skip only if no rounds.md (single-shot slice, no debug iteration). Bridges CLAUDE.md §root-cause-first into the unified D-code ratchet — D7 had 0 receipts despite multi-round bugs being logged, leaving the ratchet blind to flag-tweak loops.
